@@ -216,47 +216,71 @@ def test_negative_actual_decay():
     shutil.rmtree(sandbox)
 
 
-def test_stale_read_floor():
+def test_regression_smoothing():
     """
-    Regression test for the stale-read floor added 2026-09-13: Sleeper's
-    live matchup endpoint occasionally serves a transiently stale read (a
-    lagging replica during high-traffic windows) where a player's points
-    briefly drop below what an earlier poll already recorded, then
-    self-correct a poll or two later. Confirmed in production: player 9221
-    (roster 14) went 12.3 -> 6.2 -> 12.3 across three consecutive polls,
-    with six other players across six other rosters dropping the same
-    minute — and because the flash logic only fires on point *increases*,
-    that poll's frame showed zero flashes, which is what first surfaced
-    this.
+    Regression test for the hindsight-based smoothing added 2026-09-13 in
+    render.py's build_frames (NOT in poll.py -- see below for why not).
 
-    A normal player's actual points must never be recorded lower than a
-    prior poll already saw this week. A DEF/ST slot (players_team.get
-    falls back to the pid itself for those) must be EXEMPT from this floor
-    — this league's pts_allow penalty legitimately gets MORE negative as a
-    defense gives up more points, so it has to be allowed to move in
-    either direction, same reasoning as the negative-actual gate in
-    compute_projected_total.
+    Two confirmed production cases pull in opposite directions:
+
+    1. Jahmyr Gibbs (roster 14, pid 9221) read 12.3 -> 6.2 -> 12.3 across
+       three consecutive 3-minute polls on 2026-09-13 -- a transient stale
+       read from a lagging Sleeper replica that self-corrected one poll
+       later. This should be smoothed: the middle frame's dip is noise, not
+       signal, and it suppressed that frame's pop-up flash entirely (the
+       flash logic only fires on point *increases*).
+
+    2. Blake Corum (roster 1, pid 11586) read ...6.8 -> 5.0... on
+       2026-09-10 and never came back anywhere near 6.8 for the rest of
+       that game or the rest of the week. Querying Sleeper's own
+       long-since-final week 1 stats for him returns 5.4 -- i.e. 6.8 was
+       itself the bad read (a spurious upward spike), not 5.0. This must
+       NOT be smoothed: an earlier first attempt at this fix floored every
+       drop at the running max forever, which would have permanently
+       overstated this roster's score by ~1.8 points for the rest of the
+       season -- a real fantasy scoreboard silently lying about who's
+       winning is much worse than one frame missing a pop-up.
+
+    The distinguishing signal is recovery speed, which a LIVE poll can't
+    observe (it can't see "the next poll or two" before they happen) --
+    this is why the fix lives in render.py, replayed over the full
+    already-stored history every render, and never mutates
+    data/week<N>.jsonl itself. A genuine stale read self-heals within
+    STALE_READ_LOOKAHEAD snapshots of being recorded; a genuine correction
+    doesn't recover at all.
     """
-    sandbox = tempfile.mkdtemp(prefix="scoreboard-selftest-staleread-")
+    sandbox = tempfile.mkdtemp(prefix="scoreboard-selftest-smoothing-")
     data_dir = os.path.join(sandbox, "data")
+    docs_dir = os.path.join(sandbox, "docs")
     os.makedirs(data_dir)
+    os.makedirs(docs_dir)
 
     fake_state = {"season": "2026", "week": 1, "display_week": 1, "season_type": "regular"}
-    # poll #1: p1 (normal player) at 10.0, def1 (DEF slot) at -1.0.
-    fake_matchups_1 = [
-        {"roster_id": 1, "points": 10.0, "starters": ["p1"], "players_points": {"p1": 10.0}},
-        {"roster_id": 2, "points": -1.0, "starters": ["def1"], "players_points": {"def1": -1.0}},
-    ]
-    # poll #2: p1's raw read regresses to 6.0 (the stale-replica glitch) —
-    # must be floored back to 10.0. def1 legitimately worsens to -3.0 (gave
-    # up more points) — must NOT be floored, since that's real, not stale.
-    fake_matchups_2 = [
-        {"roster_id": 1, "points": 6.0, "starters": ["p1"], "players_points": {"p1": 6.0}},
-        {"roster_id": 2, "points": -3.0, "starters": ["def1"], "players_points": {"def1": -3.0}},
+    # roster 1 / g (Gibbs-style): dips one poll, recovers the next -> smooth.
+    # roster 2 / c (Corum-style): dips and never recovers -> trust it.
+    # roster 3 / def1 (DEF slot, absent from fake_player_teams so it
+    # resolves to itself): dips like a DEF legitimately can -> never smoothed regardless.
+    matchups_seq = [
+        [
+            {"roster_id": 1, "points": 12.3, "starters": ["g"], "players_points": {"g": 12.3}},
+            {"roster_id": 2, "points": 6.8, "starters": ["c"], "players_points": {"c": 6.8}},
+            {"roster_id": 3, "points": -1.0, "starters": ["def1"], "players_points": {"def1": -1.0}},
+        ],
+        [
+            {"roster_id": 1, "points": 6.2, "starters": ["g"], "players_points": {"g": 6.2}},
+            {"roster_id": 2, "points": 5.0, "starters": ["c"], "players_points": {"c": 5.0}},
+            {"roster_id": 3, "points": -3.0, "starters": ["def1"], "players_points": {"def1": -3.0}},
+        ],
+        [
+            {"roster_id": 1, "points": 12.3, "starters": ["g"], "players_points": {"g": 12.3}},
+            {"roster_id": 2, "points": 5.0, "starters": ["c"], "players_points": {"c": 5.0}},
+            {"roster_id": 3, "points": -3.0, "starters": ["def1"], "players_points": {"def1": -3.0}},
+        ],
     ]
     fake_projections = {}
-    fake_player_teams = {"p1": "AAA"}  # def1 deliberately absent -> resolves to itself, i.e. a DEF slot
-    matchup_seq = iter([fake_matchups_1, fake_matchups_2])
+    fake_player_teams = {"g": "AAA", "c": "BBB"}  # def1 deliberately absent -> a DEF slot
+    matchup_seq = iter(matchups_seq)
+    now_seq = iter(["2026-09-13T17:30:00Z", "2026-09-13T17:33:00Z", "2026-09-13T17:36:00Z"])
 
     common.get_state = lambda: fake_state
     common.get_league = lambda league_id: FAKE_LEAGUE
@@ -264,7 +288,7 @@ def test_stale_read_floor():
     common.get_projections = lambda season, week, season_type="regular": fake_projections
     common.load_player_teams = lambda: fake_player_teams
     common.team_game_progress = lambda season, week, season_type="regular": {}
-    common.now_iso = lambda: "2026-09-13T17:33:00Z"
+    common.now_iso = lambda: next(now_seq)
     common.DATA_DIR = data_dir
     common.PLAYERS_CACHE = os.path.join(data_dir, "players_cache.json")
     os.environ["LEAGUE_ID"] = TEST_LEAGUE
@@ -273,20 +297,30 @@ def test_stale_read_floor():
     poll.LEAGUE_ID = TEST_LEAGUE
     poll.main()
     poll.main()
+    poll.main()
 
+    # data/week1.jsonl itself must be untouched -- the raw dips are stored exactly as Sleeper reported them.
     snaps = common.load_snapshots(1)
-    assert len(snaps) == 2, f"expected 2 snapshots, got {len(snaps)}"
-    r1_poll2 = snaps[1]["rosters"]["1"]
-    r2_poll2 = snaps[1]["rosters"]["2"]
+    assert [s["rosters"]["1"]["players_points"]["g"] for s in snaps] == [12.3, 6.2, 12.3]
+    assert [s["rosters"]["2"]["players_points"]["c"] for s in snaps] == [6.8, 5.0, 5.0]
 
-    assert r1_poll2["players_points"]["p1"] == 10.0, r1_poll2  # floored, not the stale 6.0
-    assert r1_poll2["actual"] == 10.0, r1_poll2
-    assert r2_poll2["players_points"]["def1"] == -3.0, r2_poll2  # DEF exempt, real worsening kept
-    assert r2_poll2["actual"] == -3.0, r2_poll2
+    import render
+    frames = render.build_frames(snaps, ["1", "2", "3"], fake_player_teams)
 
-    print("stale-read floor (non-DEF only): PASS")
-    print("  poll 2, roster 1 (floored p1):", r1_poll2)
-    print("  poll 2, roster 2 (unfloored DEF):", r2_poll2)
+    g_actuals = [f["teams"][0]["actual"] for f in frames]
+    c_actuals = [f["teams"][1]["actual"] for f in frames]
+    assert g_actuals == [12.3, 12.3, 12.3], g_actuals  # dip smoothed away
+    assert c_actuals == [6.8, 5.0, 5.0], c_actuals      # sustained drop trusted, NOT floored back to 6.8
+
+    # the dip frame must NOT flash (nothing really happened), and the
+    # recovery frame must not either (it's a no-op once smoothed) --
+    # otherwise smoothing would trade "missing flash" for "phantom flash."
+    assert frames[1]["flashes"] == [], frames[1]["flashes"]
+    assert frames[2]["flashes"] == [], frames[2]["flashes"]
+
+    print("regression smoothing (render-time, non-destructive): PASS")
+    print("  Gibbs-style (self-corrects) actuals:", g_actuals)
+    print("  Corum-style (sustained drop) actuals:", c_actuals)
 
     shutil.rmtree(sandbox)
 
@@ -364,7 +398,7 @@ def main():
 
     test_scoring_fallback()
     test_negative_actual_decay()
-    test_stale_read_floor()
+    test_regression_smoothing()
 
     print("\nALL SELFTESTS PASSED (ran entirely in a throwaway temp dir — your real data/ and docs/ were untouched)")
 

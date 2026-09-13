@@ -124,6 +124,59 @@ looking mistake:
    negative value across `data/week<N>.jsonl` — `pts < 0.0`, not
    `<= 0.0` — since that's the only condition the old gate got wrong.
 
+5. **The stale-read floor trap (2026-09-13).** Sleeper's live matchup
+   endpoint occasionally serves a transiently stale read (a lagging
+   replica during high-traffic windows): a player's `players_points` value
+   briefly drops below what an earlier poll already recorded, then
+   self-corrects a poll or two later. Confirmed in production: Jahmyr
+   Gibbs (roster 14, pid 9221) read 12.3 -> 6.2 -> 12.3 across three
+   consecutive 3-minute polls, with several other players across several
+   other rosters dropping the same minute. Effect: that frame's real
+   points briefly regressed on the bars, AND — this is what actually
+   surfaced it — the pop-up "flash" for that frame vanished entirely,
+   since the flash logic only fires on a point *increase*, never a
+   decrease.
+
+   **First attempt at a fix (reverted, do NOT redo this):** floor every
+   player's `players_points` at poll time in `poll.py` at whatever was
+   already recorded for them this week — "a real player's points only
+   ever go up." This is WRONG and was caught before shipping to the full
+   season: also confirmed in production, Blake Corum (roster 1, pid
+   11586) read `...29.3 -> 31.2 -> 29.4...` on 2026-09-10 and never came
+   back anywhere near 31.2 for the rest of that game or the rest of the
+   week. Querying Sleeper's own current (long-since-final) week 1 stats
+   for him returns 5.4 points — i.e. the LOWER ~29.4-ish reading was
+   closer to correct, and 31.2 was itself the bad read (a spurious
+   *upward* spike), not the other way around. A "never decrease" floor
+   applied forever would have permanently overstated that roster's score
+   by ~1.8 points for the rest of the season — a real fantasy scoreboard
+   silently lying about who's winning is a much worse failure than one
+   frame missing a pop-up. **The general lesson: a value moving backward
+   is not proof it's wrong. Which direction is "the glitch" can only be
+   told by what happens NEXT, not by assuming stats are monotonic.**
+
+   **The actual fix:** lives in `render.py`'s `build_frames`
+   (`_smooth_regressions`, `STALE_READ_LOOKAHEAD = 2`), not in `poll.py`,
+   and never rewrites `data/week<N>.jsonl` — the stored file always stays
+   exactly what Sleeper reported. At render time (which always has the
+   benefit of hindsight over the full already-stored history), a drop is
+   only smoothed over if one of the next `STALE_READ_LOOKAHEAD` readings
+   recovers back to at least the pre-drop level — that's the signature of
+   a transient stale read. A drop that never recovers within that window
+   is accepted as the new real value, and comparisons going forward
+   measure against it, not the old (apparently wrong) peak. A live poll
+   can't apply this — it can't see "the next poll or two" before they
+   happen — so the newest frame in any given render may briefly show an
+   unsmoothed dip until the next poll's data lets this function look back
+   far enough to correct it retroactively; this is expected, and is
+   exactly the ~3-6 minute self-heal window observed in production. DEF/ST
+   slots (`players_team.get(pid, pid) == pid`) are exempt from smoothing
+   entirely, same reasoning as bug #4: their `pts_allow` penalty
+   legitimately moves in either direction. Regression test:
+   `test_regression_smoothing()` in `selftest.py`, which encodes both the
+   Gibbs case (must smooth) and the Corum case (must NOT smooth) so
+   neither failure mode can silently come back.
+
 ## ESPN dependency — currently dormant, not broken
 
 `common.team_game_progress()` reads ESPN's public, unauthenticated scoreboard

@@ -29,7 +29,86 @@ SERIES_LIGHT = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300"
 SERIES_DARK = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"]
 
 
-def build_frames(snapshots, roster_ids):
+# How many snapshots ahead to look, when a player's points appear to have
+# dropped, for a recovery back to (at least) the pre-drop level before
+# accepting the drop as real. See _smooth_regressions's docstring.
+STALE_READ_LOOKAHEAD = 2
+
+
+def _smooth_regressions(raw_sequence):
+    """
+    Sleeper's live matchup endpoint occasionally serves a transiently stale
+    read (a lagging replica during high-traffic windows) where a player's
+    points briefly drop below a prior poll's value, then self-correct within
+    a poll or two. Confirmed in production 2026-09-13: Jahmyr Gibbs (roster
+    14) read 12.3 -> 6.2 -> 12.3 across three consecutive 3-minute polls.
+
+    This must NOT be "fix" by simply flooring every drop at the running
+    max, forever: also confirmed in production, Blake Corum (roster 1) read
+    ...29.3 -> 31.2 -> 29.4... on 2026-09-10 and never came back anywhere
+    near 31.2 for the rest of that game or the rest of the week -- querying
+    Sleeper's own current (long-since-final) week 1 stats for him returns
+    5.4 points, i.e. the LOWER 29.4-ish reading was closer to correct and
+    31.2 was itself the bad read (a spurious upward spike), not the other
+    way around. A naive "never decrease" floor would have permanently
+    overstated that roster's score by ~1.8 points for the rest of the
+    season. Real stat corrections are rare but real -- Sleeper does
+    occasionally revise a play's yardage/TD after the fact -- and a
+    sustained lower value must be trusted, not overridden.
+
+    The distinguishing signal is recovery speed: a stale READ corrects
+    itself within a poll or two; a genuine correction does not bounce back
+    at all. So: given the full, already-recorded sequence for one
+    (roster, player) in chronological order, only smooth a drop over if one
+    of the next STALE_READ_LOOKAHEAD readings comes back up to at least the
+    pre-drop level. A drop that never recovers within that window is
+    accepted as the new real value, and comparisons going forward measure
+    against it, not the old (apparently wrong) peak.
+
+    This runs at render time, over the full already-stored history, and
+    never writes anything back to data/week<N>.jsonl -- the stored file
+    stays exactly what Sleeper reported. A live poll can't apply this (it
+    can't see "the next poll or two" before they happen), so the newest
+    frame in any given render may briefly show an unsmoothed dip until the
+    next poll's data lets this function look ahead far enough to correct it
+    retroactively -- exactly the ~3-6 minute self-heal window observed
+    above.
+    """
+    trusted = None
+    smoothed = []
+    for i, v in enumerate(raw_sequence):
+        if trusted is None or v >= trusted:
+            trusted = v
+        else:
+            lookahead = raw_sequence[i + 1 : i + 1 + STALE_READ_LOOKAHEAD]
+            if any(later >= trusted for later in lookahead):
+                v = trusted  # transient dip: hold at the last trusted value
+            else:
+                trusted = v  # sustained drop: accept it as the new reality
+        smoothed.append(v)
+    return smoothed
+
+
+def build_frames(snapshots, roster_ids, players_team):
+    def is_def(pid):
+        return players_team.get(pid, pid) == pid
+
+    # Smooth each (roster, player)'s raw points across the whole history
+    # before building any frame -- needs the full sequence up front, so it
+    # can't be done incrementally frame-by-frame like the rest below.
+    raw_by_rp = {}
+    for snap in snapshots:
+        for rid in roster_ids:
+            r = snap.get("rosters", {}).get(rid) or {}
+            for pid, pts in r.get("players_points", {}).items():
+                raw_by_rp.setdefault((rid, pid), []).append(pts or 0.0)
+
+    smoothed_by_rp = {
+        key: seq if is_def(key[1]) else _smooth_regressions(seq)
+        for key, seq in raw_by_rp.items()
+    }
+    next_idx = {key: 0 for key in raw_by_rp}
+
     frames = []
     prev_points = {rid: {} for rid in roster_ids}
     for snap in snapshots:
@@ -38,9 +117,17 @@ def build_frames(snapshots, roster_ids):
         flashes = []
         for rid in roster_ids:
             r = rosters.get(rid, {"actual": 0, "projected": 0, "players_points": {}})
-            teams_frame.append({"id": rid, "actual": r["actual"], "projected": r["projected"]})
 
-            cur_pp = r.get("players_points", {})
+            cur_pp = {}
+            for pid in r.get("players_points", {}):
+                key = (rid, pid)
+                cur_pp[pid] = smoothed_by_rp[key][next_idx[key]]
+                next_idx[key] += 1
+
+            actual = round(sum(cur_pp.values()), 2) if cur_pp else r["actual"]
+            projected = round(max(r["projected"], actual), 2)
+            teams_frame.append({"id": rid, "actual": actual, "projected": projected})
+
             for pid, pts in cur_pp.items():
                 delta = pts - prev_points[rid].get(pid, 0.0)
                 if delta > 0.05:
@@ -63,7 +150,8 @@ def render_week(week):
         return None
 
     players = common.load_players_cache()
-    frames = build_frames(snapshots, roster_ids)
+    players_team = common.load_player_teams()
+    frames = build_frames(snapshots, roster_ids, players_team)
 
     # resolve player labels for flashes actually used, so the page payload stays small
     used_pids = {f["pid"] for fr in frames for f in fr["flashes"]}
