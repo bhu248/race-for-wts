@@ -505,10 +505,15 @@ TEMPLATE = r"""<!doctype html>
   // a "resize" event once it becomes visible at the same logical window
   // size. ResizeObserver watches the bar-track element itself, so it
   // fires on that transition too, not just on window resizes.
+  // Re-running render() on resize too (not just layoutAxis) re-measures
+  // the score-label anti-overlap nudge above against the bar-track's new
+  // width -- a fixed pixel shift computed for the old width would drift
+  // out of sync with the labels' real positions otherwise.
+  function onResize(){ layoutAxis(); render(current); }
   if (window.ResizeObserver){
-    new ResizeObserver(layoutAxis).observe(rows[0].bar.parentNode);
+    new ResizeObserver(onResize).observe(rows[0].bar.parentNode);
   } else {
-    window.addEventListener("resize", layoutAxis);
+    window.addEventListener("resize", onResize);
   }
 
   function render(idx){
@@ -522,6 +527,13 @@ TEMPLATE = r"""<!doctype html>
     var order = f.teams.slice().sort(function(a,b){ return b.projected - a.projected; }).map(function(t){ return t.id; });
     var rank = {};
     order.forEach(function(id,pos){ rank[id] = pos; });
+
+    // Both score labels' text width is fixed in px, but their "left" is a
+    // % of the bar-track — need the track's actual rendered width once to
+    // compare the two in the same units below. Reusing layoutAxis's own
+    // approach: every row shares identical flex sizing, so one measurement
+    // (any row's track) applies to all of them.
+    var trackWidthPx = rows[0].bar.parentNode.getBoundingClientRect().width;
 
     rows.forEach(function(r){
       var t = byId[r.id];
@@ -540,7 +552,26 @@ TEMPLATE = r"""<!doctype html>
       // same and a second identical label next to the first is just noise.
       if (t.projected - t.actual > 0.05){
         r.scoreProj.textContent = t.projected.toFixed(1);
-        r.scoreProj.style.left = "calc(" + pctProj + "% + 8px)";
+
+        // When the two bars are close in length (a game nearly over, with
+        // only a little projected upside left), their two number labels
+        // can land close enough to visually collide or overlap outright
+        // -- the % gap between the bars says nothing about the labels'
+        // fixed pixel text width, which is what actually matters here.
+        // Computed in pure pixel math (not measured via
+        // getBoundingClientRect on the live elements) because both labels
+        // have `transition: left`, and reading position synchronously
+        // right after setting it can reflect a stale, pre-transition
+        // value rather than the new target -- offsetWidth is unaffected
+        // since only `left`, not width, is transitioned.
+        var actualLeftPx = (pct / 100) * trackWidthPx + 8;
+        var actualRightPx = actualLeftPx + r.score.offsetWidth;
+        var projLeftPx = (pctProj / 100) * trackWidthPx + 8;
+        var LABEL_GAP = 6;
+        if (projLeftPx < actualRightPx + LABEL_GAP) {
+          projLeftPx = actualRightPx + LABEL_GAP;
+        }
+        r.scoreProj.style.left = projLeftPx.toFixed(1) + "px";
       } else {
         r.scoreProj.textContent = "";
       }
