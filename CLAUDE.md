@@ -177,6 +177,45 @@ looking mistake:
    Gibbs case (must smooth) and the Corum case (must NOT smooth) so
    neither failure mode can silently come back.
 
+6. **The pregame-ceiling ceiling (2026-09-13).** Not a bug in the sense of
+   1-5 above — the old formula was doing exactly what it was designed to
+   do — but a deliberate, user-requested methodology change worth
+   documenting with the same rigor, since it touches the same function.
+   `remaining` used to be `max(pregame_projection - actual, 0) * (1 -
+   elapsed)`: once a player's actual EXCEEDED their full pregame
+   projection, `max(...)` hit zero and stayed there, so the model
+   credited them with ZERO further upside for the rest of their game, no
+   matter how much time was left. Confirmed in production (Team
+   lynnbear, week 1): Trevor Lawrence, Derrick Henry, and Parker
+   Washington had each already exceeded their full pregame projection
+   with roughly half their game still to play, and the roster's
+   projected total (120.18) barely moved past its actual (87.34) despite
+   three starters clearly having big days — user-reported as "her
+   players are doing very well" but the total not reflecting it.
+   **Change:** `remaining = max(pregame_projection, 0) * (1 - elapsed) **
+   2` — no longer subtracts `actual` at all, so scoring more always
+   raises the projected total by exactly that much, with no ceiling to
+   run into. The `** 2` (not linear `(1 - elapsed)`) is deliberate: it's
+   an extra discount against trusting a still-small, possibly-noisy
+   sample as durable for the rest of the game, so residual upside decays
+   faster than time alone would suggest as elapsed grows, while barely
+   discounted (~1) right after kickoff. This isn't a special case needing
+   its own branch: at `pts == 0.0` (elapsed forced to 0 by bug #2's gate),
+   it reduces to exactly `pregame_projection`, identical to the existing
+   scoreless-player behavior. Verified against Lynn's real live roster
+   before shipping: old formula gave 120.18, new formula gives ~133.9,
+   matching her own expectation (~136) far better than either the old
+   number or a naive `actual/elapsed` pace-extrapolation would (which
+   overshoots wildly — computed ~200 for the same roster — since it has
+   no discount for small-sample noise and is numerically unstable near
+   elapsed=0). Regression test: `test_overperformer_upside()` in
+   `selftest.py`. Not retroactively applied to already-stored `projected`
+   values in `data/week<N>.jsonl` — only future polls use the new
+   formula, so expect a one-time step up in projected totals once this
+   ships, which is a normal formula-version bump, not a repeat of bug
+   #3's disagreeing-live-formulas flapping (there is still only ONE
+   formula live at any given moment).
+
 ## ESPN dependency — currently dormant, not broken
 
 `common.team_game_progress()` reads ESPN's public, unauthenticated scoreboard

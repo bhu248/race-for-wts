@@ -129,10 +129,13 @@ def test_scoring_fallback():
     snaps = common.load_snapshots(1)
     assert len(snaps) == 3, f"expected 3 snapshots, got {len(snaps)}"
 
+    # remaining = 7.0 * (1-elapsed)**2, independent of actual (2026-09-13
+    # change) -- so poll 1 (elapsed=0) is actual + the FULL pregame value,
+    # not capped at pregame like the old max(pregame-actual,0) did.
     q1_1, q1_2, q1_3 = (s["rosters"]["1"] for s in snaps)
-    assert q1_1["actual"] == 2.0 and q1_1["projected"] == 7.0, q1_1
-    assert q1_2["actual"] == 2.0 and q1_2["projected"] == 4.5, q1_2
-    assert q1_3["actual"] == 2.0 and q1_3["projected"] == 2.0, q1_3
+    assert q1_1["actual"] == 2.0 and q1_1["projected"] == 9.0, q1_1     # 2.0 + 7.0*(1-0.0)**2 = 9.0
+    assert q1_2["actual"] == 2.0 and q1_2["projected"] == 3.75, q1_2    # 2.0 + 7.0*(1-0.5)**2 = 3.75
+    assert q1_3["actual"] == 2.0 and q1_3["projected"] == 2.0, q1_3     # 2.0 + 7.0*(1-1.0)**2 = 2.0
 
     for q2_snap in (s["rosters"]["2"] for s in snaps):
         assert q2_snap["actual"] == 0.0 and q2_snap["projected"] == 7.0, q2_snap
@@ -212,6 +215,87 @@ def test_negative_actual_decay():
 
     print("negative-actual (leaky DEF) decay: PASS")
     print("  final snapshot:", r1)
+
+    shutil.rmtree(sandbox)
+
+
+def test_overperformer_upside():
+    """
+    Regression test for the 2026-09-13 remaining-upside formula change in
+    compute_projected_total: `remaining` used to be
+    `max(pregame_projection - actual, 0) * (1 - elapsed)`, which meant a
+    player who'd already exceeded their FULL pregame projection got
+    credited with ZERO further upside for the rest of their game, however
+    much time was left. Confirmed in production (Team lynnbear, week 1):
+    Trevor Lawrence, Derrick Henry, and Parker Washington had each already
+    exceeded their full pregame projection with roughly half their game
+    left, and the roster's projected total barely moved past its actual
+    despite three starters clearly having big days.
+
+    `remaining` is now `max(pregame_projection, 0) * (1 - elapsed) ** 2`
+    -- independent of actual entirely, so a hot player keeps accruing
+    projected upside past their pregame ceiling, decaying only with time
+    remaining (squared, as an extra discount against trusting a small,
+    possibly-noisy sample too much).
+    """
+    sandbox = tempfile.mkdtemp(prefix="scoreboard-selftest-overperform-")
+    data_dir = os.path.join(sandbox, "data")
+    os.makedirs(data_dir)
+
+    fake_state = {"season": "2026", "week": 1, "display_week": 1, "season_type": "regular"}
+    # hot's actual (18.34) already exceeds their full pregame projection
+    # (17.35) with the game only half over (elapsed=0.5) -- like Trevor
+    # Lawrence in the production case above. cold is a normal
+    # still-on-pace player in the same game, included as a control to
+    # confirm the formula change doesn't affect an unremarkable player.
+    fake_matchups = [
+        {"roster_id": 1, "points": 18.34, "starters": ["hot"], "players_points": {"hot": 18.34}},
+        {"roster_id": 2, "points": 5.0, "starters": ["cold"], "players_points": {"cold": 5.0}},
+    ]
+    # A single trivial scoring stat, so pregame_projection == the raw
+    # number below exactly -- keeps the assertions easy to hand-verify.
+    fake_league = {"scoring_settings": {"stat": 1.0}}
+    fake_projections = {
+        "hot": {"stat": 17.35},
+        "cold": {"stat": 10.0},
+    }
+    fake_player_teams = {"hot": "AAA", "cold": "AAA"}
+
+    common.get_state = lambda: fake_state
+    common.get_league = lambda league_id: fake_league
+    common.get_matchups = lambda league_id, week: fake_matchups
+    common.get_projections = lambda season, week, season_type="regular": fake_projections
+    common.load_player_teams = lambda: fake_player_teams
+    common.team_game_progress = lambda season, week, season_type="regular": {"AAA": 0.5}
+    common.now_iso = lambda: "2026-09-13T18:00:00Z"
+    common.DATA_DIR = data_dir
+    common.PLAYERS_CACHE = os.path.join(data_dir, "players_cache.json")
+    os.environ["LEAGUE_ID"] = TEST_LEAGUE
+
+    import poll
+    poll.LEAGUE_ID = TEST_LEAGUE
+    poll.main()
+
+    snaps = common.load_snapshots(1)
+    hot = snaps[0]["rosters"]["1"]
+    cold = snaps[0]["rosters"]["2"]
+
+    # hot: 18.34 + 17.35*(1-0.5)**2 = 18.34 + 4.3375 = 22.6775 -> 22.68.
+    # Must be strictly greater than actual -- the whole point is a hot
+    # player with half a game left still projects for more, not a
+    # flatline at their already-exceeded pregame ceiling (17.35).
+    assert hot["actual"] == 18.34, hot
+    assert hot["projected"] == 22.68, hot
+    assert hot["projected"] > hot["actual"] > 17.35, hot
+
+    # cold: 5.0 + 10.0*(1-0.5)**2 = 5.0 + 2.5 = 7.5 -- an ordinary
+    # still-on-pace player, unaffected in kind by the formula change.
+    assert cold["actual"] == 5.0, cold
+    assert cold["projected"] == 7.5, cold
+
+    print("overperformer keeps decaying upside past pregame ceiling: PASS")
+    print("  hot (exceeded pregame mid-game):", hot)
+    print("  cold (control, still on pace):", cold)
 
     shutil.rmtree(sandbox)
 
@@ -349,16 +433,20 @@ def main():
     assert len(snaps) == 2, f"expected 2 snapshots, got {len(snaps)}"
     r1 = snaps[0]["rosters"]["1"]
     assert r1["actual"] == 6.0, r1
-    # no ESPN game-clock data yet -> elapsed=0 for every team -> reduces to
-    # the old max(actual, pregame_projection): max(0,7)=7 for p1, max(6,7)=7 for p2
-    assert r1["projected"] == 14.0, r1
+    # no ESPN game-clock data yet -> elapsed=0 for every team -> remaining
+    # is each player's full pregame projection, undiscounted: p1 gets
+    # 0 + 7*(1-0)**2 = 7, p2 gets 6 + 7*(1-0)**2 = 13 -- remaining no
+    # longer subtracts actual first (2026-09-13 change), so p2 isn't
+    # capped at their 7.0 pregame ceiling just because they've already
+    # banked 6.0 of it.
+    assert r1["projected"] == 20.0, r1
     r2 = snaps[1]["rosters"]["1"]
     assert r2["actual"] == 12.6, r2
-    # p1 (team AAA, at halftime/elapsed=0.5): actual 6.6 + (7-6.6)*0.5 = 6.8
-    # p2 (team BBB, game over/elapsed=1.0):   actual 6.0 + (7-6.0)*0.0 = 6.0
-    # 6.8 + 6.0 = 12.8 -- the live decay actually moves the number now,
-    # instead of staying frozen at 14.0 all game like the old pinned model.
-    assert r2["projected"] == 12.8, r2
+    # p1 (team AAA, at halftime/elapsed=0.5): actual 6.6 + 7*(1-0.5)**2 = 6.6 + 1.75 = 8.35
+    # p2 (team BBB, game over/elapsed=1.0):   actual 6.0 + 7*(1-1)**2   = 6.0 + 0    = 6.0
+    # 8.35 + 6.0 = 14.35 -- the live decay actually moves the number now,
+    # instead of staying frozen at 20.0 all game like the old pinned model.
+    assert r2["projected"] == 14.35, r2
 
     # p3 (roster 2) never scores in either poll, even though by poll #2
     # their team's game is 90% elapsed -- projected must stay pinned at the
@@ -398,6 +486,7 @@ def main():
 
     test_scoring_fallback()
     test_negative_actual_decay()
+    test_overperformer_upside()
     test_regression_smoothing()
 
     print("\nALL SELFTESTS PASSED (ran entirely in a throwaway temp dir — your real data/ and docs/ were untouched)")

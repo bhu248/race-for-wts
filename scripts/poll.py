@@ -19,15 +19,38 @@ LEAGUE_ID = os.environ.get("LEAGUE_ID", "1393377829990727680")
 def compute_projected_total(starters, players_points, projections_by_player, scoring, players_team, team_progress):
     """
     Live-projected final total for one roster: for each starter, their
-    actual points so far PLUS whatever's left of their pre-game projection
-    above that, decayed by how far their own NFL game has progressed — so
-    the "upside" on top of actual fades out smoothly and lands on exactly
-    their actual total once their game ends, instead of staying pinned at
-    a ceiling or cratering the instant they score.
+    actual points so far PLUS an independent "expected remaining
+    production" term, decayed by how far their own NFL game has
+    progressed — so upside fades out smoothly and lands on exactly their
+    actual total once their game ends, instead of staying pinned at a
+    ceiling or cratering the instant they score.
 
         elapsed = team_progress[team] if actual != 0 else 0.0
-        remaining = max(pregame_projection - actual, 0) * (1 - elapsed)
+        remaining = max(pregame_projection, 0) * (1 - elapsed) ** 2
         contribution = actual + remaining
+
+    CHANGED 2026-09-13: `remaining` no longer subtracts `actual` from
+    `pregame_projection` first. The previous `max(pregame_projection -
+    actual, 0)` meant a player who'd already exceeded their FULL pregame
+    projection got credited with ZERO further upside for the rest of
+    their game, no matter how much time was left — confirmed in
+    production (Team lynnbear, week 1): Trevor Lawrence, Derrick Henry,
+    and Parker Washington had each already exceeded their full pregame
+    projection with roughly half their game still to play, and the
+    roster's projected total (120.18) barely moved above its actual
+    (87.34) despite three starters clearly having big days, which is what
+    surfaced this. `remaining` is now independent of `actual` entirely —
+    it's just the original pregame projection decaying toward zero as the
+    game finishes — so scoring more always raises the total by exactly
+    that much, with no ceiling to run into. The exponent is squared, not
+    linear: a single early hot stretch is noisy and shouldn't be trusted
+    as durable for a full game's remaining upside, so the residual
+    projection shrinks faster than time alone would suggest as elapsed
+    grows, while still being ~1 (barely discounted) right after kickoff.
+    Squaring also isn't a separate special case to gate: at pts == 0.0
+    (elapsed forced to 0 below), it reduces to exactly `pregame_projection`
+    — the existing scoreless-player behavior — automatically, with no
+    extra branching needed.
 
     where raw `elapsed` (0.0-1.0) comes from common.team_game_progress
     (ESPN's public scoreboard for that player's team's game clock), blended
@@ -112,7 +135,7 @@ def compute_projected_total(starters, players_points, projections_by_player, sco
         else:
             elapsed = 0.0
 
-        remaining = max(pregame_projection - pts, 0.0) * (1.0 - elapsed)
+        remaining = max(pregame_projection, 0.0) * (1.0 - elapsed) ** 2
         projected_total += pts + remaining
     return round(actual_total, 2), round(projected_total, 2)
 
