@@ -133,17 +133,49 @@ def main():
     matchups = common.get_matchups(LEAGUE_ID, week)
     projections_by_player = common.get_projections(season, week, season_type)
     players_team = common.load_player_teams()
+    snapshots = common.load_snapshots(week)
     team_progress = common.team_game_progress(season, week, season_type)
     now_ts = common.now_iso()
     team_progress = common.estimate_scoring_fallback_progress(
-        team_progress, matchups, players_team, common.load_snapshots(week), now_ts
+        team_progress, matchups, players_team, snapshots, now_ts
     )
+
+    prev_players_points = {}
+    if snapshots:
+        for roster_id, r in snapshots[-1].get("rosters", {}).items():
+            prev_players_points[roster_id] = r.get("players_points", {})
 
     rosters_out = {}
     for m in matchups:
         roster_id = str(m["roster_id"])
         starters = m.get("starters") or []
-        players_points = m.get("players_points") or {}
+        raw_points = m.get("players_points") or {}
+        prev_points = prev_players_points.get(roster_id, {})
+
+        # Sleeper's live matchup endpoint occasionally serves a transiently
+        # stale read (a lagging replica during high-traffic windows) where a
+        # player's points briefly drop below what an earlier poll already
+        # recorded, then self-correct a poll or two later. Confirmed in
+        # production 2026-09-13: player 9221 (roster 14) went 12.3 -> 6.2 ->
+        # 12.3 across three consecutive 3-minute polls, with six other
+        # players across six other rosters dropping the same minute and all
+        # recovering next poll. A real player's actual points only ever go
+        # up during a game, so floor each one at whatever we last recorded
+        # for them this week. EXCEPT a DEF/ST slot: it's keyed by team
+        # abbreviation rather than a normal player id (players_team.get
+        # falls back to the pid itself for those -- see load_player_teams),
+        # and this league's pts_allow penalty legitimately gets MORE
+        # negative as a defense gives up more points, so it must be allowed
+        # to move in either direction, same reasoning as the negative-actual
+        # gate in compute_projected_total below.
+        players_points = {}
+        for pid, pts in raw_points.items():
+            pts = pts or 0.0
+            is_def = players_team.get(pid, pid) == pid
+            if not is_def:
+                pts = max(pts, prev_points.get(pid, 0.0))
+            players_points[pid] = pts
+
         actual, projected = compute_projected_total(
             starters, players_points, projections_by_player, scoring, players_team, team_progress
         )

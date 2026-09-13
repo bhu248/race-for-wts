@@ -165,11 +165,15 @@ def test_negative_actual_decay():
     os.makedirs(data_dir)
 
     fake_state = {"season": "2026", "week": 1, "display_week": 1, "season_type": "regular"}
-    # def1's team (DEF) gave up enough points that its actual is negative,
-    # even though its game is fully over (elapsed=1.0). def2's team is a
-    # genuinely scoreless-so-far player whose game also hasn't finished.
+    # The Rams DEF gave up enough points that its actual is negative, even
+    # though its game is fully over (elapsed=1.0). Keyed by the team's own
+    # abbreviation "LAR", exactly like real Sleeper matchup data (a DEF/ST
+    # starter slot has no separate numeric player id — see
+    # common.load_player_teams's docstring) and NOT present in
+    # fake_player_teams below, so players_team.get("LAR", "LAR") correctly
+    # falls back to itself instead of accidentally testing a normal player.
     fake_matchups = [
-        {"roster_id": 1, "points": -2.9, "starters": ["def1"], "players_points": {"def1": -2.9}},
+        {"roster_id": 1, "points": -2.9, "starters": ["LAR"], "players_points": {"LAR": -2.9}},
     ]
     # pregame projection is a normal POSITIVE 4.8 (3.0 pts allowed * -0.2,
     # plus a projected sack worth 1.0 each) -- the real final actual (-2.9)
@@ -177,10 +181,10 @@ def test_negative_actual_decay():
     # `actual > 0` gate got wrong: it fell back to elapsed=0 and left the
     # roster pinned at the full +4.8 instead of decaying to the real -2.9.
     fake_projections = {
-        "def1": {"pts_allow": 3.0, "sack": 5.4},  # 3.0*-0.2 + 5.4*1.0 = 4.8
+        "LAR": {"pts_allow": 3.0, "sack": 5.4},  # 3.0*-0.2 + 5.4*1.0 = 4.8
     }
     fake_league = {"scoring_settings": {"pts_allow": -0.2, "sack": 1.0}}
-    fake_player_teams = {"def1": "LAR"}
+    fake_player_teams = {}
 
     common.get_state = lambda: fake_state
     common.get_league = lambda league_id: fake_league
@@ -208,6 +212,81 @@ def test_negative_actual_decay():
 
     print("negative-actual (leaky DEF) decay: PASS")
     print("  final snapshot:", r1)
+
+    shutil.rmtree(sandbox)
+
+
+def test_stale_read_floor():
+    """
+    Regression test for the stale-read floor added 2026-09-13: Sleeper's
+    live matchup endpoint occasionally serves a transiently stale read (a
+    lagging replica during high-traffic windows) where a player's points
+    briefly drop below what an earlier poll already recorded, then
+    self-correct a poll or two later. Confirmed in production: player 9221
+    (roster 14) went 12.3 -> 6.2 -> 12.3 across three consecutive polls,
+    with six other players across six other rosters dropping the same
+    minute — and because the flash logic only fires on point *increases*,
+    that poll's frame showed zero flashes, which is what first surfaced
+    this.
+
+    A normal player's actual points must never be recorded lower than a
+    prior poll already saw this week. A DEF/ST slot (players_team.get
+    falls back to the pid itself for those) must be EXEMPT from this floor
+    — this league's pts_allow penalty legitimately gets MORE negative as a
+    defense gives up more points, so it has to be allowed to move in
+    either direction, same reasoning as the negative-actual gate in
+    compute_projected_total.
+    """
+    sandbox = tempfile.mkdtemp(prefix="scoreboard-selftest-staleread-")
+    data_dir = os.path.join(sandbox, "data")
+    os.makedirs(data_dir)
+
+    fake_state = {"season": "2026", "week": 1, "display_week": 1, "season_type": "regular"}
+    # poll #1: p1 (normal player) at 10.0, def1 (DEF slot) at -1.0.
+    fake_matchups_1 = [
+        {"roster_id": 1, "points": 10.0, "starters": ["p1"], "players_points": {"p1": 10.0}},
+        {"roster_id": 2, "points": -1.0, "starters": ["def1"], "players_points": {"def1": -1.0}},
+    ]
+    # poll #2: p1's raw read regresses to 6.0 (the stale-replica glitch) —
+    # must be floored back to 10.0. def1 legitimately worsens to -3.0 (gave
+    # up more points) — must NOT be floored, since that's real, not stale.
+    fake_matchups_2 = [
+        {"roster_id": 1, "points": 6.0, "starters": ["p1"], "players_points": {"p1": 6.0}},
+        {"roster_id": 2, "points": -3.0, "starters": ["def1"], "players_points": {"def1": -3.0}},
+    ]
+    fake_projections = {}
+    fake_player_teams = {"p1": "AAA"}  # def1 deliberately absent -> resolves to itself, i.e. a DEF slot
+    matchup_seq = iter([fake_matchups_1, fake_matchups_2])
+
+    common.get_state = lambda: fake_state
+    common.get_league = lambda league_id: FAKE_LEAGUE
+    common.get_matchups = lambda league_id, week: next(matchup_seq)
+    common.get_projections = lambda season, week, season_type="regular": fake_projections
+    common.load_player_teams = lambda: fake_player_teams
+    common.team_game_progress = lambda season, week, season_type="regular": {}
+    common.now_iso = lambda: "2026-09-13T17:33:00Z"
+    common.DATA_DIR = data_dir
+    common.PLAYERS_CACHE = os.path.join(data_dir, "players_cache.json")
+    os.environ["LEAGUE_ID"] = TEST_LEAGUE
+
+    import poll
+    poll.LEAGUE_ID = TEST_LEAGUE
+    poll.main()
+    poll.main()
+
+    snaps = common.load_snapshots(1)
+    assert len(snaps) == 2, f"expected 2 snapshots, got {len(snaps)}"
+    r1_poll2 = snaps[1]["rosters"]["1"]
+    r2_poll2 = snaps[1]["rosters"]["2"]
+
+    assert r1_poll2["players_points"]["p1"] == 10.0, r1_poll2  # floored, not the stale 6.0
+    assert r1_poll2["actual"] == 10.0, r1_poll2
+    assert r2_poll2["players_points"]["def1"] == -3.0, r2_poll2  # DEF exempt, real worsening kept
+    assert r2_poll2["actual"] == -3.0, r2_poll2
+
+    print("stale-read floor (non-DEF only): PASS")
+    print("  poll 2, roster 1 (floored p1):", r1_poll2)
+    print("  poll 2, roster 2 (unfloored DEF):", r2_poll2)
 
     shutil.rmtree(sandbox)
 
@@ -285,6 +364,7 @@ def main():
 
     test_scoring_fallback()
     test_negative_actual_decay()
+    test_stale_read_floor()
 
     print("\nALL SELFTESTS PASSED (ran entirely in a throwaway temp dir — your real data/ and docs/ were untouched)")
 
