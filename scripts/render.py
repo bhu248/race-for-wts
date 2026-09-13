@@ -324,7 +324,7 @@ TEMPLATE = r"""<!doctype html>
   .race-score-proj{ position:absolute; top:50%; transform:translateY(-50%); font-size:0.7rem; font-weight:600; color:var(--ink-muted); white-space:nowrap; transition: left 450ms; }
   .race-flash{ position:absolute; top:-1.05rem; font-size:0.68rem; font-weight:600; color:var(--live); opacity:0; white-space:nowrap; transition:opacity 350ms ease; }
   .race-flash.show{ opacity:1; }
-  .race-flash-prefix{ font-weight:800; animation: race-flash-glow 1.4s ease-in-out infinite; }
+  .race-flash-highlight{ font-weight:800; animation: race-flash-glow 1.4s ease-in-out infinite; }
   @keyframes race-flash-glow{
     0%, 100% { text-shadow: 0 0 3px var(--live); }
     50% { text-shadow: 0 0 8px var(--live), 0 0 14px var(--live); }
@@ -545,12 +545,19 @@ TEMPLATE = r"""<!doctype html>
         r.scoreProj.textContent = "";
       }
 
-      var fl = f.flashes.find(function(x){ return x.id === r.id; });
+      // A roster can have more than one flash in the same frame (two
+      // starters both scoring in the same poll window). Prefer one tagged
+      // "big"/"winning" over an ordinary one -- otherwise clicking a
+      // marker/legend jump could land on the right frame but show a
+      // completely different, untagged play for that team instead of the
+      // one the marker promised.
+      var flashesForRow = f.flashes.filter(function(x){ return x.id === r.id; });
+      var fl = flashesForRow.find(function(x){ return x.kind; }) || flashesForRow[0];
       if (fl){
         var label = DATA.playerLabels[fl.pid] || fl.pid;
         var prefixText = fl.kind === "big" ? "Big Play: " : (fl.kind === "winning" ? "Week-Winning Play: " : "");
-        var prefixHtml = prefixText ? '<span class="race-flash-prefix">' + prefixText + '</span>' : "";
-        r.flash.innerHTML = prefixHtml + "+" + fl.delta.toFixed(1) + " · " + label;
+        var text = prefixText + "+" + fl.delta.toFixed(1) + " · " + label;
+        r.flash.innerHTML = prefixText ? '<span class="race-flash-highlight">' + text + '</span>' : text;
         r.flash.classList.add("show");
       } else {
         r.flash.classList.remove("show");
