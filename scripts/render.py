@@ -344,7 +344,7 @@ TEMPLATE = r"""<!doctype html>
   .play-btn{ width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:var(--surface-sunken); color:var(--ink); cursor:pointer; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
   .play-btn:hover{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
   .scrub-wrap{ position:relative; flex:1 1 auto; display:flex; align-items:center; }
-  .scrub{ width:100%; appearance:none; height:4px; border-radius:2px; background:var(--surface-sunken); outline:none; cursor:pointer; }
+  .scrub{ width:100%; margin:0; appearance:none; height:4px; border-radius:2px; background:var(--surface-sunken); outline:none; cursor:pointer; }
   .scrub::-webkit-slider-thumb{ appearance:none; width:13px; height:13px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid var(--surface-raised); }
   .scrub::-moz-range-thumb{ width:13px; height:13px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid var(--surface-raised); }
   .scrub-markers{ position:absolute; left:0; right:0; top:50%; height:0; pointer-events:none; }
@@ -574,8 +574,22 @@ TEMPLATE = r"""<!doctype html>
 
   // Clickable markers for this week's 5 biggest plays + the week-winning
   // play, positioned along the scrubber by frame index.
+  //
+  // A native <input type="range">'s thumb is inset from each edge of the
+  // track by half its own width -- its center can never actually reach
+  // 0% or 100%, only THUMB_RADIUS..(100%-THUMB_RADIUS) -- but a plain
+  // "left: X%" on this absolutely-positioned overlay spans the FULL
+  // width with no such inset. The two use different position math, so a
+  // marker near either end sat visibly off from where the thumb lands
+  // after jumping to it (dead-on in the middle, drifting apart toward the
+  // edges). leftForFrame mirrors the thumb's own inset geometry via
+  // calc() so a marker's dot/star and the thumb it jumps to always align.
+  var SCRUB_THUMB_RADIUS = 6.5; // half of the 13px thumb in .scrub::-webkit-slider-thumb / -moz-range-thumb
   var markersEl = document.getElementById("scrubMarkers");
-  function pctForFrame(idx){ return frames.length > 1 ? (idx / (frames.length - 1)) * 100 : 0; }
+  function leftForFrame(idx){
+    var frac = frames.length > 1 ? (idx / (frames.length - 1)) : 0;
+    return "calc(" + SCRUB_THUMB_RADIUS + "px + (100% - " + (SCRUB_THUMB_RADIUS * 2) + "px) * " + frac + ")";
+  }
   function jumpTo(frameIdx){
     setPlaying(false);
     clearInterval(timer);
@@ -586,7 +600,7 @@ TEMPLATE = r"""<!doctype html>
   function addMarker(frameIdx, title, cls){
     var m = document.createElement("div");
     m.className = "scrub-marker" + (cls ? " " + cls : "");
-    m.style.left = pctForFrame(frameIdx) + "%";
+    m.style.left = leftForFrame(frameIdx);
     m.title = title;
     m.addEventListener("click", function(){ jumpTo(frameIdx); });
     markersEl.appendChild(m);
