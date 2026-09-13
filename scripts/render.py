@@ -324,6 +324,11 @@ TEMPLATE = r"""<!doctype html>
   .race-score-proj{ position:absolute; top:50%; transform:translateY(-50%); font-size:0.7rem; font-weight:600; color:var(--ink-muted); white-space:nowrap; transition: left 450ms; }
   .race-flash{ position:absolute; top:-1.05rem; font-size:0.68rem; font-weight:600; color:var(--live); opacity:0; white-space:nowrap; transition:opacity 350ms ease; }
   .race-flash.show{ opacity:1; }
+  .race-flash-prefix{ font-weight:800; animation: race-flash-glow 1.4s ease-in-out infinite; }
+  @keyframes race-flash-glow{
+    0%, 100% { text-shadow: 0 0 3px var(--live); }
+    50% { text-shadow: 0 0 8px var(--live), 0 0 14px var(--live); }
+  }
   .race-legend{ display:flex; gap:1.2rem; font-size:0.76rem; color:var(--ink-secondary); margin-top:1rem; flex-wrap:wrap; }
   .race-legend .item{ display:flex; align-items:center; gap:0.4em; }
   .race-legend .item.clickable{ cursor:pointer; }
@@ -543,8 +548,9 @@ TEMPLATE = r"""<!doctype html>
       var fl = f.flashes.find(function(x){ return x.id === r.id; });
       if (fl){
         var label = DATA.playerLabels[fl.pid] || fl.pid;
-        var prefix = fl.kind === "big" ? "Big Play: " : (fl.kind === "winning" ? "Week-Winning Play: " : "");
-        r.flash.textContent = prefix + "+" + fl.delta.toFixed(1) + " · " + label;
+        var prefixText = fl.kind === "big" ? "Big Play: " : (fl.kind === "winning" ? "Week-Winning Play: " : "");
+        var prefixHtml = prefixText ? '<span class="race-flash-prefix">' + prefixText + '</span>' : "";
+        r.flash.innerHTML = prefixHtml + "+" + fl.delta.toFixed(1) + " · " + label;
         r.flash.classList.add("show");
       } else {
         r.flash.classList.remove("show");
