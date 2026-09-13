@@ -300,6 +300,88 @@ def test_overperformer_upside():
     shutil.rmtree(sandbox)
 
 
+def test_scoreless_player_uses_known_team_progress():
+    """
+    Regression test for the 2026-09-13 gate change in compute_projected_
+    total: elapsed used to only ever apply to a player once THEY personally
+    recorded a nonzero stat, on the theory that a scoreless player's own
+    game might just not have gotten to them yet. Confirmed in production
+    that reasoning doesn't hold once we have a REAL, team-specific signal:
+    ESPN reported Colston Loveland's Bears game at 98% elapsed while he
+    personally stayed at 0 actual all game, but his projected total never
+    moved off its full pregame number because the old gate refused to
+    apply that 98% to him at all.
+
+    Two scoreless players in this test, same pregame projection, to
+    isolate the one thing that differs: quiet_a's team has a REAL known
+    elapsed (0.8) -- he must decay just like a scorer would. quiet_b's
+    team has NO progress signal at all (not "0", genuinely unknown) --
+    he must stay pinned at the full pregame projection, exactly like
+    bug #2 requires, since there's zero evidence his game has even
+    started. The fix is not "always decay scoreless players" (that would
+    be bug #2 again) -- it's "decay them exactly when their team's
+    progress is actually known," decoupled from whether the gate is
+    keyed on the player's own stats.
+    """
+    sandbox = tempfile.mkdtemp(prefix="scoreboard-selftest-scoreless-")
+    data_dir = os.path.join(sandbox, "data")
+    os.makedirs(data_dir)
+
+    fake_state = {"season": "2026", "week": 1, "display_week": 1, "season_type": "regular"}
+    fake_matchups = [
+        {"roster_id": 1, "points": 0.0, "starters": ["quiet_a"], "players_points": {"quiet_a": 0.0}},
+        {"roster_id": 2, "points": 0.0, "starters": ["quiet_b"], "players_points": {"quiet_b": 0.0}},
+    ]
+    fake_projections = {
+        "quiet_a": {"stat": 20.0},
+        "quiet_b": {"stat": 20.0},
+    }
+    fake_league = {"scoring_settings": {"stat": 1.0}}
+    fake_player_teams = {"quiet_a": "AAA", "quiet_b": "BBB"}
+    # AAA's real progress is known (0.8); BBB's is absent entirely, not 0 --
+    # nobody on BBB (anywhere in the league) has scored and ESPN has
+    # nothing for it either, i.e. genuinely no evidence it's even started.
+    fake_progress = {"AAA": 0.8}
+
+    common.get_state = lambda: fake_state
+    common.get_league = lambda league_id: fake_league
+    common.get_matchups = lambda league_id, week: fake_matchups
+    common.get_projections = lambda season, week, season_type="regular": fake_projections
+    common.load_player_teams = lambda: fake_player_teams
+    common.team_game_progress = lambda season, week, season_type="regular": fake_progress
+    common.now_iso = lambda: "2026-09-13T21:00:00Z"
+    common.DATA_DIR = data_dir
+    common.PLAYERS_CACHE = os.path.join(data_dir, "players_cache.json")
+    os.environ["LEAGUE_ID"] = TEST_LEAGUE
+
+    import poll
+    poll.LEAGUE_ID = TEST_LEAGUE
+    poll.main()
+
+    snaps = common.load_snapshots(1)
+    quiet_a = snaps[0]["rosters"]["1"]
+    quiet_b = snaps[0]["rosters"]["2"]
+
+    # quiet_a: 0.0 + 20.0*(1-0.8)**2 = 0.0 + 0.8 = 0.8 -- decays even
+    # though he personally never scored, because his TEAM's progress is
+    # known and nearly over.
+    assert quiet_a["actual"] == 0.0, quiet_a
+    assert quiet_a["projected"] == 0.8, quiet_a
+
+    # quiet_b: no progress signal for BBB at all -> elapsed=0.0 -> stays
+    # pinned at the full 20.0 pregame projection. Not a regression of
+    # bug #2: this isn't decaying off generic wall-clock time, it's
+    # correctly finding NO evidence BBB's game has started.
+    assert quiet_b["actual"] == 0.0, quiet_b
+    assert quiet_b["projected"] == 20.0, quiet_b
+
+    print("scoreless player decays only when their OWN team's progress is known: PASS")
+    print("  quiet_a (team progress known, 80% elapsed):", quiet_a)
+    print("  quiet_b (team progress unknown):", quiet_b)
+
+    shutil.rmtree(sandbox)
+
+
 def test_regression_smoothing():
     """
     Regression test for the hindsight-based smoothing added 2026-09-13 in
@@ -448,16 +530,27 @@ def main():
     # instead of staying frozen at 20.0 all game like the old pinned model.
     assert r2["projected"] == 14.35, r2
 
-    # p3 (roster 2) never scores in either poll, even though by poll #2
-    # their team's game is 90% elapsed -- projected must stay pinned at the
-    # full 16.0 pre-game projection both times, NOT decay toward 0 just
-    # because time passed. This is the exact bug just fixed: every roster's
-    # projected total was cratering together regardless of whether that
-    # roster had scored anything.
+    # p3 (roster 2) never scores in either poll. Poll #1 has no progress
+    # data for ANY team (FAKE_PROGRESS_1 = {}) -- with zero signal either
+    # way, p3 must stay pinned at the full 16.0 pregame projection, NOT
+    # decay toward 0 just because time passed. This is bug #2's fix: every
+    # roster's projected total was cratering together off a generic
+    # wall-clock timer, regardless of whether that roster had scored
+    # anything or its team had even started.
+    #
+    # Poll #2 DOES have a real, team-specific signal for p3's team CCC
+    # (FAKE_PROGRESS_2 sets it to 0.9 elapsed) -- unlike poll #1, this
+    # isn't "no info," it's confirmed evidence CCC's game is almost over.
+    # p3 must now decay same as a scoring player would (2026-09-13 change,
+    # the Loveland fix): 16.0 * (1-0.9)**2 = 0.16. Staying pinned at the
+    # full 16.0 here would repeat exactly the bug a user reported in
+    # production -- Colston Loveland's Bears game reported 98% elapsed
+    # while he personally stayed scoreless all game, but his projection
+    # never moved off its full pregame number.
     p3_poll1 = snaps[0]["rosters"]["2"]
     p3_poll2 = snaps[1]["rosters"]["2"]
     assert p3_poll1["actual"] == 0.0 and p3_poll1["projected"] == 16.0, p3_poll1
-    assert p3_poll2["actual"] == 0.0 and p3_poll2["projected"] == 16.0, p3_poll2
+    assert p3_poll2["actual"] == 0.0 and p3_poll2["projected"] == 0.16, p3_poll2
 
     print("poll.py logic: PASS")
     print("  snapshot 1, roster 1:", r1)
@@ -487,6 +580,7 @@ def main():
     test_scoring_fallback()
     test_negative_actual_decay()
     test_overperformer_upside()
+    test_scoreless_player_uses_known_team_progress()
     test_regression_smoothing()
 
     print("\nALL SELFTESTS PASSED (ran entirely in a throwaway temp dir — your real data/ and docs/ were untouched)")

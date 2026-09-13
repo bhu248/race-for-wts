@@ -56,25 +56,51 @@ def compute_projected_total(starters, players_points, projections_by_player, sco
     (ESPN's public scoreboard for that player's team's game clock), blended
     with common.estimate_scoring_fallback_progress for any team ESPN is
     still reporting as not-yet-started despite its players already posting
-    real stats — see that function's docstring. Either way, `elapsed` only
-    ever applies once the player has actually recorded a real stat (any
-    NONZERO actual, positive or negative). A player sitting at exactly 0
-    actual keeps their full, undecayed pre-game projection no matter how
-    much wall-clock time has passed — "hasn't scored yet" is not evidence
-    their opportunity is used up; it's just as likely their own game
-    hasn't gotten to them yet. Without this gate, a quiet player's number
-    would visibly crater over time for no reason connected to anything
-    that actually happened in their game.
+    real stats — see that function's docstring.
 
-    FIXED 2026-09-11: the gate used to be `actual > 0`, not `actual != 0`.
-    A team DEF/ST slot can legitimately have NEGATIVE actual points (this
-    league's `pts_allow` is a per-point penalty, so a defense that gets
-    torched nets negative) even once its game is completely over. `> 0`
-    treated that exactly like "hasn't played yet," pinning a finished,
-    leaky defense at its full pregame projection instead of its real
-    (negative) final score — confirmed in production Week 1 data, where a
-    roster's projected total sat ~7-8 points too high after its DEF's game
-    went final with a negative actual score.
+    CHANGED 2026-09-13 (again): `elapsed` now applies to every starter
+    whose TEAM has a real progress signal, whether or not that specific
+    player has personally recorded a stat. It used to be gated on the
+    player's own actual being nonzero — "a player sitting at exactly 0
+    actual keeps their full, undecayed pre-game projection... it's just
+    as likely their own game hasn't gotten to them yet." That reasoning
+    only holds when we DON'T know whether their game has started. Once we
+    DO — confirmed in production, week 1: ESPN reported Colston
+    Loveland's Bears game at 98% elapsed while he personally sat at 0
+    actual all game — treating him like his "opportunity hasn't arrived
+    yet" is simply wrong; the opportunity came and went, he just didn't
+    convert it. His projected total stayed frozen at his full 11.21
+    pregame number the entire game as a result, user-reported as
+    obviously too high for a game that's basically over.
+
+    This is safe against reintroducing the 2026-09-10 bug below (a
+    generic wall-clock timer decaying teams that hadn't actually started)
+    because `team_progress` itself is already properly gated at its
+    source, not here: `common.team_game_progress` only reports a real
+    elapsed for a game ESPN is actually tracking as live/final, and
+    `estimate_scoring_fallback_progress` only ever fills in a team ESPN
+    is silently treating as not-yet-started once at least one of THAT
+    team's players (anywhere in the league, not just this roster) has
+    posted a real stat. A team with truly zero signal either way —
+    ESPN says STATUS_SCHEDULED and nobody on it has scored — still
+    resolves to elapsed=0.0 for every one of its players, scoring or
+    not, no matter how much wall-clock time passes. What changed is
+    narrow: once elapsed IS known for a team, it now applies to that
+    team's quiet players too, not just its scorers.
+
+    FIXED 2026-09-11 (superseded by the 2026-09-13 change above, which
+    removed the "only decay if this player has scored" gate entirely —
+    kept here for the historical reasoning, which still applies to why a
+    DEF's negative actual must never be treated as "hasn't played"): the
+    gate used to be `actual > 0`, not `actual != 0`. A team DEF/ST slot
+    can legitimately have NEGATIVE actual points (this league's
+    `pts_allow` is a per-point penalty, so a defense that gets torched
+    nets negative) even once its game is completely over. `> 0` treated
+    that exactly like "hasn't played yet," pinning a finished, leaky
+    defense at its full pregame projection instead of its real (negative)
+    final score — confirmed in production Week 1 data, where a roster's
+    projected total sat ~7-8 points too high after its DEF's game went
+    final with a negative actual score.
 
     FIXED 2026-09-10 (again): the first version of this decay applied
     `elapsed` to every starter unconditionally, including ones sitting at
@@ -115,25 +141,13 @@ def compute_projected_total(starters, players_points, projections_by_player, sco
         stats = projections_by_player.get(pid)
         pregame_projection = common.score_stats(stats, scoring) if stats else 0.0
 
-        # Only decay once this player has actually recorded a real stat —
-        # otherwise there's nothing connecting the clock to them
-        # specifically, and we'd just be cratering a quiet player's number
-        # for no in-game reason. This must be `!= 0.0`, not `> 0.0`: a
-        # team DEF/ST slot can legitimately have NEGATIVE actual points
-        # (e.g. this league's `pts_allow` penalty) despite its game being
-        # fully over, and `> 0.0` was treating that exactly like "hasn't
-        # played yet" — pinning a finished, leaky defense at its full
-        # pregame projection instead of its real (negative) final score.
-        if pts != 0.0:
-            # A team defense/special-teams slot is keyed by the team's own
-            # abbreviation (e.g. "SEA") rather than a normal player id.
-            team = players_team.get(pid, pid)
-            elapsed = team_progress.get(team)
-            if elapsed is None:
-                elapsed = 0.0
-            elapsed = max(0.0, min(1.0, elapsed))
-        else:
+        # A team defense/special-teams slot is keyed by the team's own
+        # abbreviation (e.g. "SEA") rather than a normal player id.
+        team = players_team.get(pid, pid)
+        elapsed = team_progress.get(team)
+        if elapsed is None:
             elapsed = 0.0
+        elapsed = max(0.0, min(1.0, elapsed))
 
         remaining = max(pregame_projection, 0.0) * (1.0 - elapsed) ** 2
         projected_total += pts + remaining

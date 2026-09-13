@@ -216,6 +216,33 @@ looking mistake:
    #3's disagreeing-live-formulas flapping (there is still only ONE
    formula live at any given moment).
 
+7. **The scoreless-player progress gate (2026-09-13).** `elapsed` used to
+   only ever apply to a player once THEY personally recorded a nonzero
+   stat — see bug #2's "hasn't scored yet" reasoning. That reasoning only
+   holds when we don't know whether their game has started. Confirmed in
+   production it can be flatly wrong once we DO know: ESPN reported
+   Colston Loveland's (TE, roster lynnbear) Bears game at 98% elapsed
+   while he personally sat at 0 actual the entire game, but his projected
+   total stayed frozen at his full 11.21 pregame number regardless —
+   user-reported as obviously too high for a game that's basically over.
+   **Fix:** removed the `if pts != 0.0` gate entirely; `elapsed` now comes
+   straight from `team_progress.get(team)` for every starter, scoring or
+   not. This does NOT reintroduce bug #2 (a generic wall-clock timer
+   decaying teams that hadn't started): `team_progress` is already
+   properly gated at its source — `common.team_game_progress` only
+   reports real elapsed for a game ESPN is actually tracking, and
+   `estimate_scoring_fallback_progress` only fills in a team ESPN is
+   silently treating as not-yet-started once at least one of THAT team's
+   players (anywhere in the league) has posted a real stat. A team with
+   genuinely zero signal either way still resolves to elapsed=0.0 for
+   every one of its players no matter how much wall-clock time passes.
+   What changed is narrow: once a team's elapsed IS known, it now applies
+   to that team's quiet players too, not just its scorers. Regression
+   test: `test_scoreless_player_uses_known_team_progress()` in
+   `selftest.py`, which encodes both halves (decay when team progress is
+   known; stay pinned when it genuinely isn't) so neither direction can
+   silently regress.
+
 ## ESPN dependency — currently dormant, not broken
 
 `common.team_game_progress()` reads ESPN's public, unauthenticated scoreboard
