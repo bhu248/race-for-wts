@@ -41,7 +41,7 @@ auth anywhere in this project — keep it that way.
   via a Windows Task Scheduler job (`SundayScoreboardLocalTrigger`) on
   bhu24's machine, checks `WEEKLY_WINDOWS`/`DATE_WINDOWS` (the local
   equivalent of the old cron list) against current UTC time, and calls
-  `gh workflow run scoreboard.yml --repo bhu248/sunday-scoreboard` when
+  `gh workflow run scoreboard.yml --repo bhu248/race-for-wts` when
   inside a window. No-op outside game windows. Logs every decision
   (dispatched or skipped) to `local_scheduler.log` in the repo root
   (gitignored). The 2026-specific Friday/Saturday `DATE_WINDOWS` have no

@@ -20,7 +20,7 @@ import pathlib
 import subprocess
 import sys
 
-REPO = "bhu248/sunday-scoreboard"
+REPO = "bhu248/race-for-wts"
 WORKFLOW = "scoreboard.yml"
 LOG_PATH = pathlib.Path(__file__).resolve().parent.parent / "local_scheduler.log"
 

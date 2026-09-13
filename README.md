@@ -1,4 +1,4 @@
-# Sunday Scoreboard
+# Race for Weekly Top Scorer
 
 A live, week-by-week time-lapse of your Sleeper league's scoring, rebuilt from
 real API snapshots every few minutes during game windows. Built for league
@@ -15,7 +15,7 @@ schedule and a static page.
 ## One-time setup
 
 1. **Create the repo.** On github.com, click "New repository," name it
-   whatever you like (e.g. `sunday-scoreboard`), and create it empty — don't
+   whatever you like (e.g. `race-for-wts`), and create it empty — don't
    add a README or .gitignore there, this folder already has one.
 
 2. **Push this folder to it.** From inside this folder:
@@ -23,7 +23,7 @@ schedule and a static page.
    ```
    git init
    git add .
-   git commit -m "Sunday Scoreboard"
+   git commit -m "Race for Weekly Top Scorer"
    git branch -M main
    git remote add origin https://github.com/bhu248/<your-repo-name>.git
    git push -u origin main

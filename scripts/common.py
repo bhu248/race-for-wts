@@ -41,7 +41,7 @@ ESPN_SEASON_TYPE = {"pre": 1, "regular": 2, "post": 3}
 ESPN_TEAM_ALIAS = {"WSH": "WAS"}  # ESPN's abbreviation -> Sleeper's, where they differ
 
 _session = requests.Session()
-_session.headers.update({"User-Agent": "sunday-scoreboard/1.0 (+github actions)"})
+_session.headers.update({"User-Agent": "race-for-wts/1.0 (+github actions)"})
 
 
 def _get(url, params=None):
