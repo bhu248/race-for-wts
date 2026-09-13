@@ -74,8 +74,8 @@ def render_week(week):
     # purely by delta size across every flash, positive swings only (a
     # costly INT or fumble isn't modeled as a "big play" here, just the
     # exciting kind). Known simplification: two of the week's top 5 plays
-    # landing in the same 5-minute poll window will render as overlapping
-    # dots — rare enough at 5-minute polling that it isn't worth
+    # landing in the same poll window will render as overlapping
+    # dots — rare enough at a few minutes' polling cadence that it isn't worth
     # de-overlapping.
     all_flashes = []
     for idx, fr in enumerate(frames):

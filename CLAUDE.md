@@ -37,7 +37,7 @@ auth anywhere in this project — keep it that way.
   "Scheduling moved off GitHub, onto the local machine" below) because
   GitHub's scheduler was unreliable in production. The old cron windows are
   kept as comments in the YAML for reference only — they are not live.
-- `scripts/local_scheduler.py` — the actual timer now. Runs every 5 minutes
+- `scripts/local_scheduler.py` — the actual timer now. Runs every 3 minutes
   via a Windows Task Scheduler job (`SundayScoreboardLocalTrigger`) on
   bhu24's machine, checks `WEEKLY_WINDOWS`/`DATE_WINDOWS` (the local
   equivalent of the old cron list) against current UTC time, and calls
@@ -204,7 +204,9 @@ moment ESPN's status finally catches up and takes back over. See
   further — instead, the `schedule:` trigger was removed entirely and
   replaced with `scripts/local_scheduler.py`, driven by a Windows Task
   Scheduler job on bhu24's own machine, which calls `gh workflow run`
-  (`workflow_dispatch`) directly every 5 minutes during game windows. This
+  (`workflow_dispatch`) directly every 3 minutes during game windows (changed
+  from 5 minutes on 2026-09-13 — see the Windows Task Scheduler job's
+  trigger `Repetition.Interval`, not a value in this repo's code). This
   has an obvious tradeoff worth surfacing if it comes up: the workflow now
   only fires while that machine is on, awake, and logged in — it's no
   longer a GitHub-side schedule. If snapshots are missing during a game,

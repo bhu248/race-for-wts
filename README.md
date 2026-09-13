@@ -88,7 +88,7 @@ trusting it with a full Sunday and an actual prize on the line.
 GitHub's own cron scheduler was observed missing runs by 15-20+ minutes or
 more during the Week 1 opener, with nothing diagnosable from outside GitHub.
 Timing now lives on your local machine instead: `scripts/local_scheduler.py`
-runs every 5 minutes via a Windows Task Scheduler job named
+runs every 3 minutes via a Windows Task Scheduler job named
 `SundayScoreboardLocalTrigger`, checks whether it's currently inside a game
 window (the same Sunday/Monday/Wednesday/Thursday-night + specific
 Friday/Saturday windows the old cron comments described — now living as
@@ -116,13 +116,13 @@ Each firing:
 3. If anything changed, it's committed and pushed — Pages picks up the new
    file within about a minute.
 
-Polling runs every 5 minutes. That's coarser than the 1–3 minutes mentioned
-in the original feasibility check, but 5 minutes still reads as smooth,
-continuous motion once it's animated.
+Polling runs every 3 minutes, within the 1–3 minutes mentioned in the
+original feasibility check, and reads as smooth, continuous motion once
+it's animated.
 
 ## Known limitations (carried over from the feasibility check)
 
-- **It's a time-lapse, not a live feed.** Bars move every 5 minutes, not on
+- **It's a time-lapse, not a live feed.** Bars move every 3 minutes, not on
   every literal snap.
 - **The live-projection number is a simplification.** A starter's remaining
   projection drops to zero the moment they register *any* stat, not at their

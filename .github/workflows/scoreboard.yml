@@ -10,7 +10,7 @@ name: Sunday Scoreboard
 # the Week 1 opener, with nothing diagnosable from outside GitHub (workflow
 # wasn't disabled, no GitHub status incident, cron was valid) — see
 # CLAUDE.md. Scheduling now happens on the local machine instead:
-# scripts/local_scheduler.py runs every 5 minutes via Windows Task
+# scripts/local_scheduler.py runs every 3 minutes via Windows Task
 # Scheduler and calls `gh workflow run` (i.e. workflow_dispatch, below)
 # whenever it's inside a game window. Its window logic is the local
 # equivalent of what used to be the cron list here; the windows below are

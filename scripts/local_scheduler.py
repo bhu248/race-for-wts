@@ -3,9 +3,9 @@
 GitHub's own cron scheduler was observed missing scheduled runs by 15-20+
 minutes or more during the Week 1 opener (see CLAUDE.md), with nothing
 diagnosable from outside GitHub. This script is meant to be run on a plain
-Windows Task Scheduler timer every 5 minutes, always, and calls
+Windows Task Scheduler timer every 3 minutes, always, and calls
 `gh workflow run` directly instead of relying on GitHub's scheduler. It's a
-no-op outside game windows, so running it unconditionally every 5 minutes is
+no-op outside game windows, so running it unconditionally every 3 minutes is
 intentional and safe — `gh` decides nothing here, this script does.
 
 The window logic mirrors what used to live in the `schedule:` block of
