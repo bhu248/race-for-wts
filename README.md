@@ -88,17 +88,18 @@ trusting it with a full Sunday and an actual prize on the line.
 GitHub's own cron scheduler was observed missing runs by 15-20+ minutes or
 more during the Week 1 opener, with nothing diagnosable from outside GitHub.
 Timing now lives on your local machine instead: `scripts/local_scheduler.py`
-ticks every 1 minute via a Windows Task Scheduler job named
+ticks every 3 minutes via a Windows Task Scheduler job named
 `SundayScoreboardLocalTrigger`, checks whether it's currently inside a game
 window (the same Sunday/Monday/Wednesday/Thursday-night + specific
 Friday/Saturday windows the old cron comments described — now living as
 `WEEKLY_WINDOWS`/`DATE_WINDOWS` in that script), and if so — and if it's
 actually due, per its own adaptive cadence: every 3 minutes while 2+ NFL
-games are concurrently live anywhere, every 5 when it's down to one (or
+games are concurrently live anywhere, every 6 when it's down to one (or
 zero) — calls `gh workflow run scoreboard.yml` (a `workflow_dispatch`, the
-only trigger left in the YAML). The 1-minute tick is just how often it
-*checks*; it doesn't poll Sleeper any more often than the 3/5-minute
-cadence actually calls for. **This means the workflow only fires while your machine
+only trigger left in the YAML). The 3-minute tick is just how often it
+*checks*; since 6 is a clean multiple of 3, both cadences land on their
+exact target from that one tick with no need to check any more often than
+that. **This means the workflow only fires while your machine
 is on, awake, and logged in during game windows** — it's not a
 GitHub-side schedule anymore. Check the task with:
 
@@ -120,14 +121,14 @@ Each firing:
 3. If anything changed, it's committed and pushed — Pages picks up the new
    file within about a minute.
 
-Polling runs every 3 minutes during a full slate and every 5 once it's down
+Polling runs every 3 minutes during a full slate and every 6 once it's down
 to one game, both within (or close to) the 1–3 minutes mentioned in the
 original feasibility check, and reads as smooth, continuous motion once
 it's animated.
 
 ## Known limitations (carried over from the feasibility check)
 
-- **It's a time-lapse, not a live feed.** Bars move every 3-5 minutes
+- **It's a time-lapse, not a live feed.** Bars move every 3-6 minutes
   (depending on how many games are concurrently live), not on every
   literal snap.
 - **The live-projection number is a simplification.** A starter's remaining

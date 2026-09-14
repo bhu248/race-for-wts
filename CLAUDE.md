@@ -327,13 +327,14 @@ moment ESPN's status finally catches up and takes back over. See
   Scheduler job on bhu24's own machine, which calls `gh workflow run`
   (`workflow_dispatch`) directly during game windows — see the Windows
   Task Scheduler job's trigger `Repetition.Interval` for the OS-level
-  tick (1 minute as of 2026-09-14, up from 3 minutes on 2026-09-13, up
-  from 5 minutes originally — not a value in this repo's code), but
-  `local_scheduler.py` itself decides on top of that whether a given
-  tick actually dispatches: 3 minutes when 2+ NFL games are concurrently
-  live, 5 minutes when only one (or zero) is, per
-  `common.count_live_games` — see the "adaptive polling cadence" note
-  below. This has an obvious tradeoff worth surfacing if it comes up: the workflow now
+  tick (3 minutes as of 2026-09-14 — briefly 1 minute for a few hours
+  that same day, before the sparse cadence below settled on a
+  multiple-of-3 value; up from 3 minutes on 2026-09-13, up from 5 minutes
+  originally — not a value in this repo's code), but `local_scheduler.py`
+  itself decides on top of that whether a given tick actually dispatches:
+  3 minutes when 2+ NFL games are concurrently live, 6 minutes when only
+  one (or zero) is, per `common.count_live_games` — see the "adaptive
+  polling cadence" note below. This has an obvious tradeoff worth surfacing if it comes up: the workflow now
   only fires while that machine is on, awake, and logged in — it's no
   longer a GitHub-side schedule. If snapshots are missing during a game,
   check the scheduled task's state/log first (see README "How it runs")
@@ -348,15 +349,18 @@ moment ESPN's status finally catches up and takes back over. See
   Week 1 data, six different fantasy rosters all had a player in the same
   single NE@SEA game.
 - **Adaptive polling cadence (2026-09-14).** User-requested: poll every 3
-  minutes when a full slate is live, every 5 when it's down to (at most)
-  one game, rather than one fixed interval all game long.
-  `local_scheduler.py`'s Windows Task Scheduler trigger now ticks every 1
-  minute (the GCD of 3 and 5, so both cadences land exactly instead of
-  rounding up to some multiple of a coarser tick) — but the script itself
-  decides whether a given tick actually dispatches, using
-  `common.count_live_games()` (2+ concurrent live games anywhere on the
-  real NFL scoreboard = dense/3min, else sparse/5min) and a small
-  gitignored state file, `local_scheduler_last_dispatch.txt`, to remember
+  minutes when a full slate is live, every 6 when it's down to (at most)
+  one game, rather than one fixed interval all game long. (Originally
+  requested as 5 minutes; changed to 6 shortly after shipping.)
+  `local_scheduler.py`'s Windows Task Scheduler trigger ticks every 3
+  minutes — briefly 1 minute right after this first shipped, since 3 and
+  the original 5-minute sparse target only share a GCD of 1, but once the
+  sparse target changed to 6 (a clean multiple of 3) the tick moved back
+  down to 3 with no precision lost. The script itself decides whether a
+  given tick actually dispatches, using `common.count_live_games()` (2+
+  concurrent live games anywhere on the real NFL scoreboard = dense/3min,
+  else sparse/6min) and a small gitignored state file,
+  `local_scheduler_last_dispatch.txt`, to remember
   when it last actually dispatched across separate process invocations
   (each tick is a fresh `python` process — nothing persists in memory
   between them). This does NOT poll Sleeper any more often than before;

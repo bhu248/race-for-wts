@@ -3,27 +3,32 @@
 GitHub's own cron scheduler was observed missing scheduled runs by 15-20+
 minutes or more during the Week 1 opener (see CLAUDE.md), with nothing
 diagnosable from outside GitHub. This script is meant to be run on a plain
-Windows Task Scheduler timer every 1 minute, always, and calls
+Windows Task Scheduler timer every 3 minutes, always, and calls
 `gh workflow run` directly instead of relying on GitHub's scheduler. It's a
 no-op most ticks (either outside game windows, or inside one but not yet
 due for a dispatch at the current cadence — see DENSE_INTERVAL_MIN /
-SPARSE_INTERVAL_MIN below), so running it unconditionally every minute is
-intentional and safe — `gh` decides nothing here, this script does.
+SPARSE_INTERVAL_MIN below), so running it unconditionally every 3 minutes
+is intentional and safe — `gh` decides nothing here, this script does.
 
-CHANGED 2026-09-14: the OS-level tick moved from every 3 minutes to every
-1 minute, and this script now decides its OWN dispatch cadence rather
-than dispatching on every tick: DENSE_INTERVAL_MIN (3) when 2+ NFL games
-are live across the whole scoreboard (a full concurrent slate justifies
-tighter polling), SPARSE_INTERVAL_MIN (5) when only one game (or zero,
-though that shouldn't happen inside a real window) is live -- e.g. the
-tail end of a Sunday afternoon down to a single late game, or a standalone
-Thursday/Sunday/Monday night game with nothing else on. 1 minute is the
-finest granularity that divides evenly into BOTH 3 and 5 (their GCD),
-which is what makes each cadence land on its exact target instead of
-rounding up to some multiple of a coarser tick. Actual dispatches (and
-therefore actual Sleeper polls / git commits) still only happen at the
-3- or 5-minute cadence -- this doesn't poll Sleeper any more often, it
-just wakes up more often to CHECK whether it's time to.
+CHANGED 2026-09-14: this script now decides its OWN dispatch cadence
+rather than dispatching on every tick: DENSE_INTERVAL_MIN (3) when 2+ NFL
+games are live across the whole scoreboard (a full concurrent slate
+justifies tighter polling), SPARSE_INTERVAL_MIN (6) when only one game
+(or zero, though that shouldn't happen inside a real window) is live --
+e.g. the tail end of a Sunday afternoon down to a single late game, or a
+standalone Thursday/Sunday/Monday night game with nothing else on. The
+OS-level tick briefly moved to every 1 minute (the GCD of 3 and an
+originally-requested 5) so both cadences would land on their exact
+target instead of rounding up to some multiple of a coarser tick; once
+the sparse target changed to 6 (a clean multiple of 3), the GCD went
+back to 3 and the tick moved back down to match — no precision lost, and
+3x fewer wake-ups than the 1-minute tick needed. If SPARSE_INTERVAL_MIN
+is ever changed again to something that ISN'T a multiple of
+DENSE_INTERVAL_MIN, the OS tick needs to shrink back to their GCD, same
+as it did the first time. Actual dispatches (and therefore actual
+Sleeper polls / git commits) still only happen at the 3- or 6-minute
+cadence -- this doesn't poll Sleeper any more often, it just wakes up
+enough to CHECK whether it's time to.
 
 Needs LAST_DISPATCH_PATH (gitignored, next to local_scheduler.log) to
 remember when it last actually dispatched across separate invocations --
@@ -50,7 +55,7 @@ LOG_PATH = pathlib.Path(__file__).resolve().parent.parent / "local_scheduler.log
 LAST_DISPATCH_PATH = pathlib.Path(__file__).resolve().parent.parent / "local_scheduler_last_dispatch.txt"
 
 DENSE_INTERVAL_MIN = 3
-SPARSE_INTERVAL_MIN = 5
+SPARSE_INTERVAL_MIN = 6
 DENSE_LIVE_GAME_THRESHOLD = 2  # 2+ concurrent live games counts as "dense"
 
 # (weekday, hour_start, hour_end) — Python .weekday(): Mon=0 ... Sun=6, UTC hours, inclusive.
