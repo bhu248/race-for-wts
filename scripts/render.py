@@ -343,6 +343,8 @@ TEMPLATE = r"""<!doctype html>
   .race-controls{ display:flex; align-items:center; gap:0.8rem; margin-top:1.1rem; padding-top:1rem; border-top:1px solid var(--border); }
   .play-btn{ width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:var(--surface-sunken); color:var(--ink); cursor:pointer; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
   .play-btn:hover{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+  .speed-btn{ min-width:2.4rem; height:32px; padding:0 0.65rem; border-radius:16px; border:1px solid var(--border); background:var(--surface-sunken); color:var(--ink); cursor:pointer; font-family:inherit; font-size:0.72rem; font-weight:700; flex:0 0 auto; }
+  .speed-btn:hover{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
   .scrub-wrap{ position:relative; flex:1 1 auto; display:flex; align-items:center; }
   .scrub{ width:100%; margin:0; appearance:none; height:4px; border-radius:2px; background:var(--surface-sunken); outline:none; cursor:pointer; }
   .scrub::-webkit-slider-thumb{ appearance:none; width:13px; height:13px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid var(--surface-raised); }
@@ -372,6 +374,7 @@ TEMPLATE = r"""<!doctype html>
         <input type="range" class="scrub" id="scrub" min="0" max="0" value="0" step="1">
         <div class="scrub-markers" id="scrubMarkers"></div>
       </div>
+      <button class="speed-btn" id="speedBtn" aria-label="Playback speed" title="Playback speed — click to cycle">1x</button>
     </div>
     <div class="race-legend">
       <span class="item"><span class="swatch"></span>Actual points</span>
@@ -666,6 +669,20 @@ TEMPLATE = r"""<!doctype html>
   var playing = false;
   var timer = null;
 
+  // Playback speed: how many frames advance per 200ms tick, not a
+  // shorter tick interval -- keeps each render's own transitions
+  // (race-bar, race-score, etc. all animate over a fixed 450ms) looking
+  // just as smooth at 8x as at 1x, instead of stacking half-finished
+  // animations from ticking faster than they can complete.
+  var SPEEDS = [1, 2, 4, 8];
+  var speedIdx = 0;
+  var speedBtn = document.getElementById("speedBtn");
+  function setSpeed(idx){
+    speedIdx = ((idx % SPEEDS.length) + SPEEDS.length) % SPEEDS.length;
+    speedBtn.textContent = SPEEDS[speedIdx] + "x";
+  }
+  speedBtn.addEventListener("click", function(){ setSpeed(speedIdx + 1); });
+
   function setPlaying(p){
     playing = p;
     document.getElementById("playIcon").style.display = p ? "none" : "";
@@ -674,7 +691,7 @@ TEMPLATE = r"""<!doctype html>
 
   function tick(){
     if (!playing) return;
-    current++;
+    current += SPEEDS[speedIdx];
     if (current >= frames.length){ current = frames.length - 1; setPlaying(false); clearInterval(timer); }
     scrub.value = current;
     render(current);
