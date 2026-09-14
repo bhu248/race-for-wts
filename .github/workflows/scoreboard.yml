@@ -10,11 +10,13 @@ name: Sunday Scoreboard
 # the Week 1 opener, with nothing diagnosable from outside GitHub (workflow
 # wasn't disabled, no GitHub status incident, cron was valid) — see
 # CLAUDE.md. Scheduling now happens on the local machine instead:
-# scripts/local_scheduler.py runs every 3 minutes via Windows Task
+# scripts/local_scheduler.py ticks every 1 minute via Windows Task
 # Scheduler and calls `gh workflow run` (i.e. workflow_dispatch, below)
-# whenever it's inside a game window. Its window logic is the local
-# equivalent of what used to be the cron list here; the windows below are
-# kept as comments purely for reference, not as a live schedule.
+# whenever it's inside a game window AND due per its own adaptive cadence
+# (3min when 2+ NFL games are concurrently live, 5min otherwise — see
+# CLAUDE.md). Its window logic is the local equivalent of what used to be
+# the cron list here; the windows below are kept as comments purely for
+# reference, not as a live schedule.
 #
 #   Sunday day+night, Monday night, Wednesday night, and Thursday night —
 #   2026's Week 1 opener (Sea @ NE, Wed Sept 9) moved the usual Thursday

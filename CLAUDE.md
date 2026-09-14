@@ -37,12 +37,14 @@ auth anywhere in this project — keep it that way.
   "Scheduling moved off GitHub, onto the local machine" below) because
   GitHub's scheduler was unreliable in production. The old cron windows are
   kept as comments in the YAML for reference only — they are not live.
-- `scripts/local_scheduler.py` — the actual timer now. Runs every 3 minutes
-  via a Windows Task Scheduler job (`SundayScoreboardLocalTrigger`) on
-  bhu24's machine, checks `WEEKLY_WINDOWS`/`DATE_WINDOWS` (the local
-  equivalent of the old cron list) against current UTC time, and calls
-  `gh workflow run scoreboard.yml --repo bhu248/race-for-wts` when
-  inside a window. No-op outside game windows. Logs every decision
+- `scripts/local_scheduler.py` — the actual timer now. Ticks every 1
+  minute via a Windows Task Scheduler job (`SundayScoreboardLocalTrigger`)
+  on bhu24's machine, checks `WEEKLY_WINDOWS`/`DATE_WINDOWS` (the local
+  equivalent of the old cron list) against current UTC time, and — if
+  inside a window and due per its own adaptive cadence (3min dense / 5min
+  sparse, see "Adaptive polling cadence" below) — calls
+  `gh workflow run scoreboard.yml --repo bhu248/race-for-wts`. No-op
+  outside game windows or between due dispatches. Logs every decision
   (dispatched or skipped) to `local_scheduler.log` in the repo root
   (gitignored). The 2026-specific Friday/Saturday `DATE_WINDOWS` have no
   year field, so — same caveat as the old cron — review/remove that block
@@ -323,10 +325,15 @@ moment ESPN's status finally catches up and takes back over. See
   further — instead, the `schedule:` trigger was removed entirely and
   replaced with `scripts/local_scheduler.py`, driven by a Windows Task
   Scheduler job on bhu24's own machine, which calls `gh workflow run`
-  (`workflow_dispatch`) directly every 3 minutes during game windows (changed
-  from 5 minutes on 2026-09-13 — see the Windows Task Scheduler job's
-  trigger `Repetition.Interval`, not a value in this repo's code). This
-  has an obvious tradeoff worth surfacing if it comes up: the workflow now
+  (`workflow_dispatch`) directly during game windows — see the Windows
+  Task Scheduler job's trigger `Repetition.Interval` for the OS-level
+  tick (1 minute as of 2026-09-14, up from 3 minutes on 2026-09-13, up
+  from 5 minutes originally — not a value in this repo's code), but
+  `local_scheduler.py` itself decides on top of that whether a given
+  tick actually dispatches: 3 minutes when 2+ NFL games are concurrently
+  live, 5 minutes when only one (or zero) is, per
+  `common.count_live_games` — see the "adaptive polling cadence" note
+  below. This has an obvious tradeoff worth surfacing if it comes up: the workflow now
   only fires while that machine is on, awake, and logged in — it's no
   longer a GitHub-side schedule. If snapshots are missing during a game,
   check the scheduled task's state/log first (see README "How it runs")
@@ -340,6 +347,23 @@ moment ESPN's status finally catches up and takes back over. See
   assume different roster IDs means different real games — in this league's
   Week 1 data, six different fantasy rosters all had a player in the same
   single NE@SEA game.
+- **Adaptive polling cadence (2026-09-14).** User-requested: poll every 3
+  minutes when a full slate is live, every 5 when it's down to (at most)
+  one game, rather than one fixed interval all game long.
+  `local_scheduler.py`'s Windows Task Scheduler trigger now ticks every 1
+  minute (the GCD of 3 and 5, so both cadences land exactly instead of
+  rounding up to some multiple of a coarser tick) — but the script itself
+  decides whether a given tick actually dispatches, using
+  `common.count_live_games()` (2+ concurrent live games anywhere on the
+  real NFL scoreboard = dense/3min, else sparse/5min) and a small
+  gitignored state file, `local_scheduler_last_dispatch.txt`, to remember
+  when it last actually dispatched across separate process invocations
+  (each tick is a fresh `python` process — nothing persists in memory
+  between them). This does NOT poll Sleeper any more often than before;
+  it only wakes up more often to check whether it's time to. A
+  live-game-count fetch failure defaults to dense (3min) rather than
+  risking under-polling on bad information, same fail-safe posture as
+  `team_game_progress`'s empty-dict fallback.
 
 ## Workflow for any change to the scoring/render logic
 

@@ -3,10 +3,31 @@
 GitHub's own cron scheduler was observed missing scheduled runs by 15-20+
 minutes or more during the Week 1 opener (see CLAUDE.md), with nothing
 diagnosable from outside GitHub. This script is meant to be run on a plain
-Windows Task Scheduler timer every 3 minutes, always, and calls
+Windows Task Scheduler timer every 1 minute, always, and calls
 `gh workflow run` directly instead of relying on GitHub's scheduler. It's a
-no-op outside game windows, so running it unconditionally every 3 minutes is
+no-op most ticks (either outside game windows, or inside one but not yet
+due for a dispatch at the current cadence — see DENSE_INTERVAL_MIN /
+SPARSE_INTERVAL_MIN below), so running it unconditionally every minute is
 intentional and safe — `gh` decides nothing here, this script does.
+
+CHANGED 2026-09-14: the OS-level tick moved from every 3 minutes to every
+1 minute, and this script now decides its OWN dispatch cadence rather
+than dispatching on every tick: DENSE_INTERVAL_MIN (3) when 2+ NFL games
+are live across the whole scoreboard (a full concurrent slate justifies
+tighter polling), SPARSE_INTERVAL_MIN (5) when only one game (or zero,
+though that shouldn't happen inside a real window) is live -- e.g. the
+tail end of a Sunday afternoon down to a single late game, or a standalone
+Thursday/Sunday/Monday night game with nothing else on. 1 minute is the
+finest granularity that divides evenly into BOTH 3 and 5 (their GCD),
+which is what makes each cadence land on its exact target instead of
+rounding up to some multiple of a coarser tick. Actual dispatches (and
+therefore actual Sleeper polls / git commits) still only happen at the
+3- or 5-minute cadence -- this doesn't poll Sleeper any more often, it
+just wakes up more often to CHECK whether it's time to.
+
+Needs LAST_DISPATCH_PATH (gitignored, next to local_scheduler.log) to
+remember when it last actually dispatched across separate invocations --
+each run is a fresh process, nothing persists in memory between ticks.
 
 The window logic mirrors what used to live in the `schedule:` block of
 .github/workflows/scoreboard.yml (kept there only as comments now, for
@@ -20,9 +41,17 @@ import pathlib
 import subprocess
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import common  # noqa: E402
+
 REPO = "bhu248/race-for-wts"
 WORKFLOW = "scoreboard.yml"
 LOG_PATH = pathlib.Path(__file__).resolve().parent.parent / "local_scheduler.log"
+LAST_DISPATCH_PATH = pathlib.Path(__file__).resolve().parent.parent / "local_scheduler_last_dispatch.txt"
+
+DENSE_INTERVAL_MIN = 3
+SPARSE_INTERVAL_MIN = 5
+DENSE_LIVE_GAME_THRESHOLD = 2  # 2+ concurrent live games counts as "dense"
 
 # (weekday, hour_start, hour_end) — Python .weekday(): Mon=0 ... Sun=6, UTC hours, inclusive.
 WEEKLY_WINDOWS = [
@@ -67,6 +96,19 @@ def log(message: str) -> None:
         f.write(message + "\n")
 
 
+def load_last_dispatch():
+    """Timestamp of the last successful dispatch, or None if there hasn't been one (yet, or ever)."""
+    try:
+        text = LAST_DISPATCH_PATH.read_text(encoding="utf-8").strip()
+        return datetime.datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+    except (FileNotFoundError, ValueError):
+        return None
+
+
+def save_last_dispatch(stamp: str) -> None:
+    LAST_DISPATCH_PATH.write_text(stamp, encoding="utf-8")
+
+
 def main() -> int:
     now = datetime.datetime.now(datetime.timezone.utc)
     stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -75,7 +117,33 @@ def main() -> int:
         log(f"{stamp} outside game window, skipping")
         return 0
 
-    log(f"{stamp} in game window, dispatching {WORKFLOW}")
+    # How many real NFL games are concurrently live right now decides
+    # whether this is a "dense" or "sparse" moment -- a fetch/parse
+    # failure defaults to dense (the tighter cadence) rather than risking
+    # under-polling on bad information.
+    try:
+        sleeper_state = common.get_state()
+        season = sleeper_state["season"]
+        week = sleeper_state.get("display_week") or sleeper_state["week"]
+        season_type = sleeper_state["season_type"]
+        live_games = common.count_live_games(season, week, season_type)
+        dense = live_games >= DENSE_LIVE_GAME_THRESHOLD
+        density_desc = f"{live_games} live game(s) -> {'dense' if dense else 'sparse'}"
+    except Exception as exc:  # noqa: BLE001 - a flaky density check should never block dispatching
+        dense = True
+        density_desc = f"density check failed, defaulting dense ({exc})"
+
+    interval_min = DENSE_INTERVAL_MIN if dense else SPARSE_INTERVAL_MIN
+
+    last_dispatch = load_last_dispatch()
+    if last_dispatch is not None:
+        elapsed_min = (now - last_dispatch).total_seconds() / 60.0
+        if elapsed_min < interval_min - 0.5:  # small tolerance against tick-timing jitter
+            log(f"{stamp} in game window but only {elapsed_min:.1f}m since last dispatch "
+                f"(need {interval_min}m, {density_desc}) — skipping")
+            return 0
+
+    log(f"{stamp} in game window, dispatching {WORKFLOW} ({density_desc}, {interval_min}m cadence)")
     result = subprocess.run(
         ["gh", "workflow", "run", WORKFLOW, "--repo", REPO],
         capture_output=True,
@@ -85,7 +153,10 @@ def main() -> int:
         log(result.stdout.strip())
     if result.returncode != 0:
         log(f"{stamp} gh workflow run failed (exit {result.returncode}): {result.stderr.strip()}")
-    return result.returncode
+        return result.returncode
+
+    save_last_dispatch(stamp)
+    return 0
 
 
 if __name__ == "__main__":

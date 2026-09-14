@@ -183,6 +183,39 @@ def team_game_progress(season, week, season_type="regular"):
     return progress
 
 
+def count_live_games(season, week, season_type="regular"):
+    """
+    How many NFL games (across the WHOLE scoreboard, not just this league's
+    rostered teams) are actually in progress right now -- used by
+    local_scheduler.py to pick its polling cadence: a full slate of
+    concurrent games justifies tighter polling, a single leftover game
+    (the last one still going before or after the rest of a window) does
+    not need to be checked as often.
+
+    "In progress" excludes both ends: not yet kicked off
+    (STATUS_SCHEDULED/POSTPONED/CANCELED) and already over
+    (STATUS_FINAL/STATUS_FULL_TIME), matching the same status vocabulary
+    _elapsed_fraction already relies on above. Returns 0 on any
+    fetch/parse failure -- same fail-safe posture as team_game_progress,
+    though callers should treat 0 here as "unknown," not "confirmed
+    quiet," and default to the tighter cadence rather than under-polling.
+    """
+    try:
+        data = get_scoreboard(season, week, season_type)
+    except Exception as exc:  # noqa: BLE001 - a flaky third-party feed should never sink a poll
+        print(f"count_live_games: ESPN scoreboard fetch failed (non-fatal): {exc}", file=sys.stderr)
+        return 0
+
+    not_live = ("STATUS_SCHEDULED", "STATUS_POSTPONED", "STATUS_CANCELED", "STATUS_FINAL", "STATUS_FULL_TIME")
+    count = 0
+    for event in (data or {}).get("events", []):
+        for comp in event.get("competitions") or []:
+            status_name = ((comp.get("status") or {}).get("type") or {}).get("name")
+            if status_name not in not_live:
+                count += 1
+    return count
+
+
 def _parse_iso(ts):
     return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
 
