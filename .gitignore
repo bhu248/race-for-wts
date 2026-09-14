@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 .venv/
 local_scheduler.log
+scripts/snf_watch_once.py
+snf_watch_once.log
