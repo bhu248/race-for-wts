@@ -369,6 +369,19 @@ moment ESPN's status finally catches up and takes back over. See
   risking under-polling on bad information, same fail-safe posture as
   `team_game_progress`'s empty-dict fallback.
 
+  **Further change, same day:** pause entirely (no dispatch at all, not
+  even at the sparse cadence) when there's exactly one live game and it's
+  AT halftime (ESPN status `STATUS_HALFTIME`, via the new
+  `common.live_game_status_names` — `count_live_games` is now a thin
+  wrapper around its length). Nothing on the field changes during a
+  halftime, so there's nothing to poll for. Scoped narrowly to the
+  single-game case on purpose: two concurrent games where only one is at
+  the half still dispatches at the normal dense cadence, since the other
+  one is still being played. Verified directly against production at the
+  exact moment it mattered: tonight's SNF game (the week's only game left
+  live) was genuinely at halftime when this shipped, and the scheduler
+  correctly paused rather than dispatching on its sparse 6-minute cadence.
+
 ## Workflow for any change to the scoring/render logic
 
 1. Make the change.

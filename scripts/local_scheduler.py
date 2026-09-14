@@ -30,6 +30,17 @@ Sleeper polls / git commits) still only happen at the 3- or 6-minute
 cadence -- this doesn't poll Sleeper any more often, it just wakes up
 enough to CHECK whether it's time to.
 
+CHANGED 2026-09-14 (again): when there's exactly one live game and it's
+AT halftime (ESPN status STATUS_HALFTIME), this pauses entirely instead
+of falling back to the sparse cadence -- nothing is going to change on
+the field until the half ends, so there's no reason to poll at all until
+it does. This is narrowly scoped to the single-game case: two concurrent
+games where only one is at the half still dispatches at the normal dense
+cadence, since the OTHER game is still live and needs polling. Pausing
+doesn't touch LAST_DISPATCH_PATH, so whenever the game resumes (or a
+second game kicks off), the very next tick evaluates cleanly against
+whatever cadence applies then, same as any other in-window tick would.
+
 Needs LAST_DISPATCH_PATH (gitignored, next to local_scheduler.log) to
 remember when it last actually dispatched across separate invocations --
 each run is a fresh process, nothing persists in memory between ticks.
@@ -57,6 +68,7 @@ LAST_DISPATCH_PATH = pathlib.Path(__file__).resolve().parent.parent / "local_sch
 DENSE_INTERVAL_MIN = 3
 SPARSE_INTERVAL_MIN = 6
 DENSE_LIVE_GAME_THRESHOLD = 2  # 2+ concurrent live games counts as "dense"
+HALFTIME_STATUS = "STATUS_HALFTIME"
 
 # (weekday, hour_start, hour_end) — Python .weekday(): Mon=0 ... Sun=6, UTC hours, inclusive.
 WEEKLY_WINDOWS = [
@@ -125,13 +137,22 @@ def main() -> int:
     # How many real NFL games are concurrently live right now decides
     # whether this is a "dense" or "sparse" moment -- a fetch/parse
     # failure defaults to dense (the tighter cadence) rather than risking
-    # under-polling on bad information.
+    # under-polling on bad information. The one further case: if that
+    # single live game is AT halftime, nothing is going to change until
+    # it resumes, so pause entirely instead of just slowing down to the
+    # sparse cadence. This only applies with exactly one live game --
+    # e.g. two concurrent games where just one is at the half still needs
+    # the other one polled, so it stays dense as normal.
     try:
         sleeper_state = common.get_state()
         season = sleeper_state["season"]
         week = sleeper_state.get("display_week") or sleeper_state["week"]
         season_type = sleeper_state["season_type"]
-        live_games = common.count_live_games(season, week, season_type)
+        statuses = common.live_game_status_names(season, week, season_type)
+        live_games = len(statuses)
+        if live_games == 1 and statuses[0] == HALFTIME_STATUS:
+            log(f"{stamp} the only live game is at halftime — pausing until it resumes")
+            return 0
         dense = live_games >= DENSE_LIVE_GAME_THRESHOLD
         density_desc = f"{live_games} live game(s) -> {'dense' if dense else 'sparse'}"
     except Exception as exc:  # noqa: BLE001 - a flaky density check should never block dispatching
