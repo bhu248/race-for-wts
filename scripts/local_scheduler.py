@@ -41,6 +41,14 @@ doesn't touch LAST_DISPATCH_PATH, so whenever the game resumes (or a
 second game kicks off), the very next tick evaluates cleanly against
 whatever cadence applies then, same as any other in-window tick would.
 
+CHANGED 2026-09-27: zero live games no longer dispatches at the sparse
+cadence -- inside a window but before kickoff or after the last final,
+nothing is scored, so it skips. The one exception is the first tick
+after the live count drops to zero (tracked in LAST_LIVE_COUNT_PATH):
+one wrap-up dispatch so the final scores are captured. An ESPN fetch
+failure is NOT treated as zero -- it still falls through to the dense
+default below, so a flaky feed can't silently stop refreshes mid-game.
+
 Needs LAST_DISPATCH_PATH (gitignored, next to local_scheduler.log) to
 remember when it last actually dispatched across separate invocations --
 each run is a fresh process, nothing persists in memory between ticks.
@@ -64,6 +72,7 @@ REPO = "bhu248/race-for-wts"
 WORKFLOW = "scoreboard.yml"
 LOG_PATH = pathlib.Path(__file__).resolve().parent.parent / "local_scheduler.log"
 LAST_DISPATCH_PATH = pathlib.Path(__file__).resolve().parent.parent / "local_scheduler_last_dispatch.txt"
+LAST_LIVE_COUNT_PATH = pathlib.Path(__file__).resolve().parent.parent / "local_scheduler_last_live.txt"
 
 DENSE_INTERVAL_MIN = 3
 SPARSE_INTERVAL_MIN = 6
@@ -126,6 +135,18 @@ def save_last_dispatch(stamp: str) -> None:
     LAST_DISPATCH_PATH.write_text(stamp, encoding="utf-8")
 
 
+def load_last_live_count() -> int:
+    """Live-game count seen on the previous in-window tick (0 if unknown)."""
+    try:
+        return int(LAST_LIVE_COUNT_PATH.read_text(encoding="utf-8").strip())
+    except (FileNotFoundError, ValueError):
+        return 0
+
+
+def save_last_live_count(count: int) -> None:
+    LAST_LIVE_COUNT_PATH.write_text(str(count), encoding="utf-8")
+
+
 def main() -> int:
     now = datetime.datetime.now(datetime.timezone.utc)
     stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -148,8 +169,14 @@ def main() -> int:
         season = sleeper_state["season"]
         week = sleeper_state.get("display_week") or sleeper_state["week"]
         season_type = sleeper_state["season_type"]
-        statuses = common.live_game_status_names(season, week, season_type)
+        statuses = common.live_game_status_names(season, week, season_type, raise_on_error=True)
         live_games = len(statuses)
+        had_live_games = load_last_live_count() > 0
+        save_last_live_count(live_games)
+        if live_games == 0:
+            if not had_live_games:
+                log(f"{stamp} in game window but no games live — skipping")
+                return 0
         if live_games == 1 and statuses[0] == HALFTIME_STATUS:
             log(f"{stamp} the only live game is at halftime — pausing until it resumes")
             return 0
@@ -158,6 +185,12 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001 - a flaky density check should never block dispatching
         dense = True
         density_desc = f"density check failed, defaulting dense ({exc})"
+        live_games = None
+
+    if live_games == 0:
+        # The last game(s) just went final since the previous tick: one
+        # wrap-up dispatch so the final scores land, then quiet again.
+        return dispatch(stamp, "0 live game(s) -> final wrap-up snapshot", interval_min=None)
 
     interval_min = DENSE_INTERVAL_MIN if dense else SPARSE_INTERVAL_MIN
 
@@ -169,7 +202,12 @@ def main() -> int:
                 f"(need {interval_min}m, {density_desc}) — skipping")
             return 0
 
-    log(f"{stamp} in game window, dispatching {WORKFLOW} ({density_desc}, {interval_min}m cadence)")
+    return dispatch(stamp, density_desc, interval_min)
+
+
+def dispatch(stamp: str, density_desc: str, interval_min) -> int:
+    cadence = f", {interval_min}m cadence" if interval_min is not None else ""
+    log(f"{stamp} in game window, dispatching {WORKFLOW} ({density_desc}{cadence})")
     result = subprocess.run(
         ["gh", "workflow", "run", WORKFLOW, "--repo", REPO],
         capture_output=True,

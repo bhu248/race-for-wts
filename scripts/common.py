@@ -183,7 +183,7 @@ def team_game_progress(season, week, season_type="regular"):
     return progress
 
 
-def live_game_status_names(season, week, season_type="regular"):
+def live_game_status_names(season, week, season_type="regular", raise_on_error=False):
     """
     ESPN status `type.name` for every NFL game (across the WHOLE
     scoreboard, not just this league's rostered teams) that's actually in
@@ -200,11 +200,15 @@ def live_game_status_names(season, week, season_type="regular"):
     entirely rather than just slowing it down) needs the raw status name,
     not a collapsed boolean. Returns [] on any fetch/parse failure -- same
     fail-safe posture as team_game_progress, though callers should treat
-    that as "unknown," not "confirmed quiet."
+    that as "unknown," not "confirmed quiet." Pass raise_on_error=True to
+    get the exception instead, when "unknown" and "zero live games" must
+    be told apart (local_scheduler.py skips dispatching at zero).
     """
     try:
         data = get_scoreboard(season, week, season_type)
     except Exception as exc:  # noqa: BLE001 - a flaky third-party feed should never sink a poll
+        if raise_on_error:
+            raise
         print(f"live_game_status_names: ESPN scoreboard fetch failed (non-fatal): {exc}", file=sys.stderr)
         return []
 
