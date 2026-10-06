@@ -258,7 +258,10 @@ def render_index():
     weeks.sort(reverse=True)
 
     items = "\n".join(f'<li><a href="week{w}.html">Week {w}</a></li>' for w in weeks) or "<li>No weeks played yet.</li>"
-    html = INDEX_TEMPLATE.replace("__ITEMS__", items)
+    extras = ""
+    if os.path.exists(os.path.join(DOCS_DIR, "redraft.html")):
+        extras = '<h2>Extras</h2>\n  <ul>\n<li><a href="redraft.html">Draft Do-Over</a> &mdash; redraft with hindsight against 13 clueless bots</li>\n  </ul>'
+    html = INDEX_TEMPLATE.replace("__ITEMS__", items).replace("__EXTRAS__", extras)
     with open(os.path.join(DOCS_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(html)
 
@@ -729,6 +732,7 @@ INDEX_TEMPLATE = r"""<!doctype html>
 <style>
   body{ font-family: system-ui, sans-serif; background:#f6f5f0; color:#17181a; max-width:640px; margin:3rem auto; padding:0 1.25rem; }
   h1{ font-size:1.8rem; }
+  h2{ font-size:1.1rem; margin-top:2rem; }
   ul{ padding-left: 1.2rem; line-height: 2; }
   a{ color:#1f6b3d; font-weight:600; }
 </style>
@@ -738,6 +742,7 @@ INDEX_TEMPLATE = r"""<!doctype html>
   <ul>
 __ITEMS__
   </ul>
+  __EXTRAS__
 </body>
 </html>
 """
