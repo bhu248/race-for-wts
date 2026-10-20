@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hardwood Twins</title>
+<meta name="description" content="Every team's fantasy starting five, recast as an NBA starting five for opening night 2026-27.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f3efe6;
+    --surface:#fffdf8;
+    --surface-2:#ece6d8;
+    --text:#1d1a15;
+    --dim:#6b6457;
+    --border:#ddd5c4;
+    --court:#c8813f;
+    --chip:#e6dfcf;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14120f;
+      --surface:#1e1b17;
+      --surface-2:#28241e;
+      --text:#f1ece2;
+      --dim:#a59d8e;
+      --border:#36312a;
+      --court:#e09a57;
+      --chip:#2c2822;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#14120f;
+    --surface:#1e1b17;
+    --surface-2:#28241e;
+    --text:#f1ece2;
+    --dim:#a59d8e;
+    --border:#36312a;
+    --court:#e09a57;
+    --chip:#2c2822;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; }
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:Inter, ui-sans-serif, system-ui, sans-serif;
+    font-size:15px;
+    line-height:1.5;
+    padding:36px 16px 72px;
+  }
+  .wrap{ max-width:860px; margin:0 auto; }
+  .cond{ font-family:"Barlow Condensed", "Arial Narrow", sans-serif; }
+  .mono{ font-family:"JetBrains Mono", ui-monospace, monospace; }
+
+  header .eyebrow{
+    font-family:"JetBrains Mono", monospace;
+    font-size:.7rem; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--court); margin:0 0 6px;
+  }
+  h1{
+    font-family:"Barlow Condensed", sans-serif;
+    font-weight:800; text-transform:uppercase;
+    font-size:clamp(2.6rem, 9vw, 4.2rem);
+    line-height:.92; margin:0; letter-spacing:.01em;
+  }
+  .lede{ color:var(--dim); max-width:62ch; margin:12px 0 0; }
+  .how{
+    margin:18px 0 0; font-size:.82rem; color:var(--dim);
+    border-left:3px solid var(--court); padding:2px 0 2px 12px; max-width:70ch;
+  }
+  nav{
+    display:flex; flex-wrap:wrap; gap:6px; margin:26px 0 30px;
+  }
+  nav a{
+    text-decoration:none; color:var(--text);
+    background:var(--chip); border-radius:999px;
+    padding:5px 11px; font-size:.8rem; font-weight:500;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  nav a:hover{ background:var(--surface-2); }
+  nav a i{ width:8px; height:8px; border-radius:50%; background:var(--c1); display:inline-block; }
+
+  .team{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:14px;
+    margin:0 0 22px;
+    overflow:hidden;
+    scroll-margin-top:16px;
+  }
+  .team-top{
+    display:grid; grid-template-columns:1fr auto; gap:14px;
+    padding:18px 20px 16px;
+    border-top:6px solid var(--c1);
+    background:linear-gradient(90deg, color-mix(in srgb, var(--c1) 9%, transparent), transparent 70%);
+  }
+  .rank{ font-size:.7rem; color:var(--dim); letter-spacing:.1em; text-transform:uppercase; }
+  .fname{ font-family:"Barlow Condensed", sans-serif; font-weight:700; font-size:1.7rem; line-height:1.05; margin:2px 0 0; }
+  .owner{ color:var(--dim); font-size:.85rem; }
+  .rec{ text-align:right; }
+  .rec .big{ font-family:"Barlow Condensed", sans-serif; font-weight:700; font-size:1.7rem; line-height:1; }
+  .rec .small{ font-size:.75rem; color:var(--dim); }
+
+  .nba{
+    display:flex; gap:14px; align-items:flex-start;
+    padding:14px 20px 16px; border-top:1px solid var(--border);
+  }
+  .badge{
+    flex:none; width:54px; height:54px; border-radius:12px;
+    background:var(--c1); color:#fff;
+    display:grid; place-items:center;
+    font-family:"Barlow Condensed", sans-serif; font-weight:800; font-size:1.15rem;
+    box-shadow:inset 0 -5px 0 var(--c2);
+  }
+  .nba h2{
+    font-family:"Barlow Condensed", sans-serif; font-weight:700; text-transform:uppercase;
+    font-size:1.35rem; margin:0; line-height:1.05; letter-spacing:.02em;
+  }
+  .nba h2 small{ font-size:.8rem; color:var(--dim); font-weight:600; letter-spacing:.06em; margin-left:6px; }
+  .nba p{ margin:4px 0 0; color:var(--dim); font-size:.9rem; }
+
+  .five{ list-style:none; margin:0; padding:0; }
+  .five li{
+    display:grid;
+    grid-template-columns:52px minmax(0,1fr) 26px minmax(0,1fr);
+    gap:4px 10px; align-items:start;
+    padding:13px 20px; border-top:1px solid var(--border);
+  }
+  .slot{
+    font-family:"JetBrains Mono", monospace; font-size:.68rem;
+    background:var(--chip); border-radius:6px; padding:3px 0; text-align:center;
+    margin-top:2px;
+  }
+  .who b{ font-weight:600; display:block; }
+  .who span{ font-size:.78rem; color:var(--dim); }
+  .eq{ color:var(--court); font-weight:700; text-align:center; padding-top:1px; }
+  .why{
+    grid-column:2 / -1; font-size:.86rem; color:var(--dim); margin:2px 0 0;
+  }
+  .tag{
+    display:inline-block; font-size:.66rem; font-weight:600; text-transform:uppercase; letter-spacing:.07em;
+    color:var(--c1-text); background:color-mix(in srgb, var(--c1) 14%, transparent);
+    border-radius:4px; padding:1px 6px; margin-right:6px; vertical-align:1px;
+  }
+  html{ scroll-behavior:smooth; }
+  nav a{ cursor:pointer; }
+  .totop{
+    position:fixed; right:16px; bottom:16px; z-index:10;
+    border:1px solid var(--border); background:var(--surface); color:var(--text);
+    border-radius:999px; padding:9px 14px; font:600 .8rem Inter, sans-serif;
+    box-shadow:0 4px 14px rgba(0,0,0,.15); cursor:pointer;
+    opacity:0; pointer-events:none; transform:translateY(8px);
+    transition:opacity .2s, transform .2s;
+  }
+  .totop.show{ opacity:1; pointer-events:auto; transform:none; }
+  .totop:hover{ background:var(--surface-2); }
+  footer{ color:var(--dim); font-size:.78rem; margin-top:34px; }
+  footer a{ color:inherit; }
+
+  @media (max-width:560px){
+    .five li{ grid-template-columns:44px minmax(0,1fr); }
+    .eq{ display:none; }
+    .who.nbaguy{ grid-column:2; }
+    .who.nbaguy b::before{ content:"↔ "; color:var(--court); }
+    .why{ grid-column:1 / -1; }
+    .team-top, .nba, .five li{ padding-left:14px; padding-right:14px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">NBA opening night · Oct 20, 2026</p>
+    <h1>Hardwood<br>Twins</h1>
+    <p class="lede">The NBA season tips off tonight, so every team in the league gets an NBA twin.</p>
+    <p class="how">Each team's top QB, RB, WR, TE and FLEX through Week 6, matched to an NBA starting five.</p>
+  </header>
+  <nav id="nav"></nav>
+  <main id="teams"></main>
+  <footer>Points are Weeks 1–6 totals, as of Oct 20. "Pick" is this league's 2026 draft slot. NBA lineups are preseason projections from Sports Illustrated and Bleacher Report. All comparisons are in good fun. <a href="index.html">← Back to the scoreboard</a></footer>
+</div>
+
+<button class="totop" id="totop" type="button" aria-label="Back to top">↑ Top</button>
+
+<script>
+const NBA = {
+  NYK:{name:"New York Knicks", c1:"#006BB6", c2:"#F58426"},
+  OKC:{name:"Oklahoma City Thunder", c1:"#007AC1", c2:"#EF3B24"},
+  ATL:{name:"Atlanta Hawks", c1:"#C8102E", c2:"#C1D32F"},
+  DET:{name:"Detroit Pistons", c1:"#C8102E", c2:"#1D42BA"},
+  SAS:{name:"San Antonio Spurs", c1:"#2b2b2b", c2:"#C4CED4"},
+  HOU:{name:"Houston Rockets", c1:"#CE1141", c2:"#1a1a1a"},
+  DEN:{name:"Denver Nuggets", c1:"#0E2240", c2:"#FEC524"},
+  POR:{name:"Portland Trail Blazers", c1:"#E03A3E", c2:"#1a1a1a"},
+  MIA:{name:"Miami Heat", c1:"#98002E", c2:"#F9A01B"},
+  DAL:{name:"Dallas Mavericks", c1:"#00538C", c2:"#B8C4CA"},
+  PHI:{name:"Philadelphia 76ers", c1:"#006BB6", c2:"#ED174C"},
+  GSW:{name:"Golden State Warriors", c1:"#1D428A", c2:"#FFC72C"},
+  IND:{name:"Indiana Pacers", c1:"#002D62", c2:"#FDBB30"},
+  MEM:{name:"Memphis Grizzlies", c1:"#5D76A9", c2:"#12173F"},
+};
+
+// [slot, fantasy player, NFL team, pts, pick, NBA player, NBA pos, tag, why]
+const TEAMS = [
+ {team:"Anon Akron Billionaire", owner:"aliu98", rec:"5-1", pf:791, nba:"NYK",
+  pitch:"The defending champs. Most points in the league, tied for the best record, and an NBA counterpart that won the 2026 title and still has one of the best starting fives on paper.",
+  five:[
+   ["QB","Brock Purdy","SF",133.5,112,"Jalen Brunson","PG","Draft-day afterthoughts","Purdy went 262nd overall, dead last, in 2022. Brunson went 33rd. Both spent years being called system guys, and both are now paid like franchise players."],
+   ["RB","Jahmyr Gibbs","DET",141.2,1,"Karl-Anthony Towns","C","Breaks the mold","Towns is a seven-footer who shoots like a guard. Gibbs is a running back with sprinter speed who doubles as a real receiver. Neither plays his position the usual way, and both went No. 1 (Towns in 2015, Gibbs in this draft). Gibbs has 141.2 points in five games, the most of any back here."],
+   ["WR","Chris Olave","NO",91.5,29,"Mikal Bridges","SF","Smooth operator","Double digits in five of six weeks. Never the loudest name on the roster, just a polished route-runner who keeps getting open. Bridges plays the same way: smooth, efficient, and easy to overlook next to the stars."],
+   ["TE","Brock Bowers","LV",69.2,28,"Josh Hart","SG","Winners everywhere","Bowers won back-to-back national titles at Georgia. Hart won one at Villanova and is now a defending NBA champion. Both also fill up every column: Bowers set the rookie tight end catch record, and Hart is a triple-double threat at 6'4\". Bowers has 69.2 points in just four games."],
+   ["FLEX","Chuba Hubbard","CAR",92.6,57,"OG Anunoby","PF","Quiet money","Both signed long-term extensions with little fanfare. Hubbard's 92.6 points in five games is the Anunoby role: quietly good at everything, almost never the story."],
+  ]},
+ {team:"Volkswagen Jettas", owner:"bhu248", rec:"4-2", pf:737, nba:"OKC",
+  pitch:"Young, deep, and second in points. The Thunder have no weak link in their first five, and neither do the Jettas. The FLEX would start almost anywhere else.",
+  five:[
+   ["QB","Drake Maye","NE",113.0,54,"Shai Gilgeous-Alexander","PG","Rebuild to contender, fast","Both took over a franchise in rebuild mode and turned it around quickly. SGA was the centerpiece of OKC's rebuild and delivered a title in 2025. Maye inherited post-Brady New England and had them in the Super Bowl by his second season. After a slow start, Maye has 26.7, 39.0 and 23.8 the last three weeks."],
+   ["RB","Kenneth Walker","KC",131.0,19,"Isaiah Hartenstein","C","Free-agent bruiser","Walker left Seattle for Kansas City and kept doing the physical work: 131.0 points in five games. Hartenstein left New York for OKC in 2024 and became the Thunder's enforcer inside."],
+   ["WR","Christian Watson","GB",104.3,66,"Jalen Williams","SF","Back from the injury list","A torn ACL cost Watson a big part of 2025, and J-Dub missed most of last season. Both are healthy again and playing like No. 1 options. Watson already has two 29-point weeks."],
+   ["TE","Kyle Pitts","ATL",42.4,75,"Chet Holmgren","PF","Unicorn frame","Pitts is the highest-drafted tight end ever (No. 4, 2021). Chet went No. 2 and missed his entire first season. Both have frames scouts dream about. Pitts opened 0.0, 2.0, 1.0, then put up 20.5 in Week 6."],
+   ["FLEX","Garrett Wilson","NYJ",77.3,47,"Cason Wallace","SG","Fifth starter, first-option talent","Wilson would be a WR1 on half the rosters in this league; here he's the FLEX. Wallace takes over Lu Dort's starting spot this year, and he'd be a bigger name on a worse team too."],
+  ]},
+ {team:"BigWangs", owner:"awang1324", rec:"5-1", pf:712, nba:"ATL",
+  pitch:"Built on players nobody saw coming. Atlanta's core is a pile of breakouts (Jalen Johnson, Dyson Daniels) plus journeymen who finally found a home. BigWangs is 5–1 with a 151st-pick QB.",
+  five:[
+   ["QB","Tyler Shough","NO",112.6,151,"Dyson Daniels","SG","Most Improved","Daniels went from a bench piece in New Orleans to the NBA's Most Improved Player in his first Atlanta season. If the NFL had that award, Shough might be the favorite: a rookie fill-in last year, now the fourth-highest-scoring QB on these starting fives (112.6), behind only Allen, Purdy and Maye."],
+   ["RB","Javonte Williams","DAL",99.0,24,"Nickeil Alexander-Walker","SG","The long way back","Javonte tore his ACL in 2022 and needed two seasons to look like himself again, and the move to Dallas finished the job: 99.0 points and a 28.8 in Week 4. NAW needed four teams to find his footing. Both are better players now than when they broke in."],
+   ["WR","Amon-Ra St. Brown","DET",84.7,5,"Jalen Johnson","PF","The centerpiece","Both were passed over in the 2021 draft (St. Brown 112th, Johnson 20th) and grew into the player everything runs through. With Trae Young gone to Washington, Atlanta is Johnson's team, and this roster runs through St. Brown, who had 30.7 in Week 2."],
+   ["TE","Tyler Higbee","LAR",40.6,null,"CJ McCollum","PG","Elder statesman","The oldest starter on each team, Higbee at 33 and McCollum at 35. Both have long résumés and nothing left to prove. Higbee went undrafted here and has 9+ in three of the last four weeks."],
+   ["FLEX","Bhayshul Tuten","JAX",81.9,61,"Onyeka Okongwu","C","Waited his turn","Okongwu spent years behind Clint Capela before Atlanta handed him the starting job. Tuten sat behind Travis Etienne as a rookie and now leads the backfield, with 81.9 points and a 22.7 Week 6."],
+  ]},
+ {team:"SgtGigglesIV", owner:"SgtGigglesIV", rec:"4-2", pf:707, nba:"DET",
+  pitch:"Rebuilt from the clearance rack. Detroit went from a 28-game losing streak to a contender. SgtGiggles took C.J. Stroud with pick 218 and found a TE1 at pick 106.",
+  five:[
+   ["QB","C.J. Stroud","HOU",107.7,218,"Cade Cunningham","PG","Top pick, bounced back","Stroud went No. 2 in 2023, ran into sophomore-slump talk, and fell to pick 218 in this draft. He's at 107.7. Cade went No. 1, lived through Detroit's worst stretch, and came out an All-Star."],
+   ["RB","James Cook","BUF",109.6,7,"Jalen Duren","C","Contract saga","Cook had a very public contract standoff before he got paid, and Duren's contract talks dragged into October. Both kept producing anyway: Cook has 20+ in four of the last five weeks."],
+   ["WR","Matthew Golden","GB",85.7,119,"Ausar Thompson","SF","Athletic upside","A late first-round pick in 2025 who is trending up: 17.3 and 19.4 the last two weeks. Ausar's game works the same way. The athleticism came first and the rest keeps catching up."],
+   ["TE","Isaiah Likely","NYG",89.3,106,"Duncan Robinson","SG","Bet on himself","Both spent years as role players for the team that found them: Likely behind Mark Andrews in Baltimore, Robinson as Miami's undrafted shooter. Both left for a bigger role somewhere new, and it's paying off. Likely's 89.3 is the most of any tight end on these starting fives."],
+   ["FLEX","Drake London","ATL",72.9,22,"John Collins","PF","Atlanta originals","Both were Atlanta first-rounders: London at No. 8 in 2022, Collins at No. 19 in 2017. Both are productive and a bit underrated by anyone who doesn't watch every game."],
+  ]},
+ {team:"bigBurger221", owner:"bigBurger221", rec:"2-4", pf:695, nba:"SAS",
+  pitch:"Too talented to stay 2–4. Fifth in points and stuck near the bottom of the standings. The Spurs are the 'just wait' team: the talent is obvious and the record is going to catch up.",
+  five:[
+   ["WR","Jaxon Smith-Njigba","SEA",140.4,9,"Victor Wembanyama","C","Not fair","Both came out of the 2023 draft, JSN at 20th and Wemby at 1st, and both are now the best at what they do. JSN's 140.4 points makes him WR1 here by 33."],
+   ["QB","Jayden Daniels","WAS",80.2,76,"De'Aaron Fox","PG","Pure speed","Two of the fastest players at their position in their sport. Daniels missed two weeks, came back, and dropped 29.8."],
+   ["FLEX","Ashton Jeanty","LV",87.4,20,"Stephon Castle","SG","Year two","High-profile picks in their second seasons. Castle won Rookie of the Year. Jeanty opened with 29.7 in Week 1 and has been steady since."],
+   ["TE","Tyler Warren","IND",54.9,65,"Devin Vassell","SF","Lottery twins","Warren went No. 14 in 2025 and Vassell went No. 11 in 2021. Both are first-round picks still settling into the role their team wants."],
+   ["RB","D'Andre Swift","CHI",96.8,48,"Julian Champagnie","PF","Philly was a layover","Both passed through Philadelphia on the way to where they stuck. Swift got one season with his hometown Eagles before Chicago signed him. Champagnie started out on a 76ers two-way deal before San Antonio claimed him off waivers. Now both are dependable starters, and Swift has 96.8 points, including 31.9 in Week 1."],
+  ]},
+ {team:"lynnbear", owner:"lynnbear", rec:"4-2", pf:659, nba:"HOU",
+  pitch:"An ageless star plus guys who had to earn it. Houston paired a 38-year-old Kevin Durant with a young, physical core. lynnbear has a 32-year-old Derrick Henry and an undrafted FLEX, and keeps winning.",
+  five:[
+   ["RB","Derrick Henry","BAL",113.3,18,"Kevin Durant","SF","Ageless and oversized","A 6'3\", 247-pound running back and a seven-footer who plays like a wing. Both are the wrong size for their position, and both are still among the best at it in their 30s."],
+   ["QB","Trevor Lawrence","JAX",112.2,95,"Jabari Smith Jr.","PF","Paid on potential","Both were the consensus top prospect in their draft, and both signed big extensions in 2024 while people were still debating whether they'd lived up to it. Lawrence is making the debate shorter this year: 112.2 points and a season-high 28.3 in Week 6."],
+   ["FLEX","Jaylen Warren","PIT",93.3,74,"Fred VanVleet","PG","Undrafted","Nobody drafted either one. Warren went undrafted in 2022 and posted 33.8 in Week 5. VanVleet went undrafted in 2016, won a ring, and got paid."],
+   ["TE","George Kittle","SF",76.7,89,"Amen Thompson","SF","Effort guys","Kittle is the best blocking tight end of his generation and Amen is one of the best defenders in basketball. Their best work doesn't show up in the box score."],
+   ["WR","Emeka Egbuka","TB",57.1,46,"Alperen Şengün","C","Craft over speed","Neither wins with raw athleticism. Egbuka gets open with polished routes and footwork, and Şengün scores in the post with fakes and touch that look borrowed from a 15-year vet. After a quiet start, Egbuka has 14+ in each of the last two weeks."],
+  ]},
+ {team:"vnkn", owner:"vnkn", rec:"3-3", pf:641, nba:"DEN",
+  pitch:"One MVP and a .500 record. Josh Allen has 158.3 points, 25 more than any other QB in the league. Jokić has shown that one player carrying a team doesn't guarantee wins.",
+  five:[
+   ["QB","Josh Allen","BUF",158.3,23,"Nikola Jokić","C","The MVP","The QB barely anyone recruited out of high school, and the center drafted 41st while the broadcast was showing a Taco Bell ad. Both now own MVP trophies and both are the whole offense."],
+   ["WR","Ja'Marr Chase","CIN",66.4,6,"Jamal Murray","PG","Half of a famous duo","Chase and Joe Burrow have been a pair since LSU's 2019 title team, and Murray and Jokić have been together in Denver since 2016. When either duo is clicking, their team is unstoppable. Chase has 66.4 points in five games, with two 20-point weeks."],
+   ["TE","Trey McBride","ARI",78.6,34,"Aaron Gordon","PF","Made in Colorado","McBride became a star at Colorado State in Fort Collins, about an hour up the road from Denver. Gordon became a champion in Denver after Orlando traded him there. Both are physical, both do the dirty work, and McBride has 78.6 points with 12+ in four of six weeks."],
+   ["RB","Bucky Irving","TB",78.1,51,"Christian Braun","SG","Took the job","Irving was a 2024 fourth-round pick who became Tampa Bay's lead back as a rookie. Braun was a late first-rounder who played a real role on Denver's 2023 title team as a rookie, then earned his way into the starting five. Irving had 30.5 in Week 5."],
+   ["FLEX","Kyle Monangai","CHI",56.8,107,"Cameron Johnson","SF","Late arrival","Johnson played five college seasons and entered the NBA at 23, older than most of his draft class. Monangai spent four years at Rutgers before going in the seventh round in 2025. Both had to wait, and Monangai still had 27.5 in Week 4."],
+  ]},
+ {team:"Hakuna Matata", owner:"EATTHEPAIN", rec:"2-4", pf:639, nba:"POR",
+  pitch:"Talent, a fun backcourt, and questions about fit. Portland just put Ja Morant next to Damian Lillard. Hakuna has Goff and CeeDee and is still 2–4.",
+  five:[
+   ["QB","Jared Goff","DET",107.5,129,"Damian Lillard","PG","Second acts","Both got written off. The Rams shipped Goff to Detroit as part of the price for Stafford, and he turned into a Pro Bowler there. Milwaukee waived Lillard after his Achilles tear, and he went back to Portland. Now both are veterans, Goff at 32 and Lillard at 36, and both grew up in the Bay Area. Goff has 107.5 points in five games."],
+   ["WR","CeeDee Lamb","DAL",107.1,17,"Ja Morant","PG","Sharing the spotlight","Both are used to being the show and now share it. Dallas added George Pickens across from Lamb, and Portland put Morant next to Damian Lillard. It hasn't slowed Lamb down: 107.1 points, second-most of any receiver here, with 31.3 and 32.8 weeks."],
+   ["TE","Sam LaPorta","DET",63.1,68,"Deni Avdija","SF","Undersold","LaPorta was a second-round pick and is a top tight end when healthy. Avdija spent years hearing 'what is he?' before becoming Portland's best all-around player."],
+   ["RB","Braelon Allen","NYJ",51.9,177,"Donovan Clingan","C","Biggest in the room","Allen was the youngest player in the 2024 draft and runs at about 235 pounds. Clingan is a 7'2\" third-year center. Both are huge and young, and Allen's put up 17.6 and 11.4 the last two weeks."],
+   ["FLEX","Tre Tucker","LV",66.5,179,"Toumani Camara","SF","Throw-in turned starter","Tucker went 179th in this draft and put up 24.2 in Week 6. Camara came to Portland as a throw-in in the Lillard trade and turned into a starter."],
+  ]},
+ {team:"Claude Antonelli", owner:"caiismyname", rec:"2-4", pf:636, nba:"MIA",
+  pitch:"Heat Culture: grinders, veterans who've been everywhere, and a former No. 1 pick. Miami traded for Giannis and surrounded him with vets. Claude Antonelli runs it through Jonathan Taylor the same way.",
+  five:[
+   ["RB","Jonathan Taylor","IND",113.0,4,"Giannis Antetokounmpo","C","The freak","Size, breakaway speed, and the whole offense on his back. Giannis bulldozes to the rim, and JT bulldozes to 113.0 points."],
+   ["QB","Bryce Young","CAR",106.5,null,"Andrew Wiggins","SF","No. 1 picks, revised","Bryce Young went No. 1 in 2023, was benched in 2024, and went undrafted in this league. He has 106.5, ahead of Mahomes. Wiggins went No. 1 in 2014, got called a bust, and became a key starter on a title team."],
+   ["WR","Nico Collins","HOU",62.5,25,"Bam Adebayo","PF","Beat the draft slot","Collins was a third-rounder and Bam went 14th. Both became the player their franchise builds around. Collins has missed two games and still had 27.3 in Week 4."],
+   ["FLEX","Stefon Diggs","WAS",57.4,109,"Klay Thompson","SG","Vet, new jersey","Diggs is 32 and on his fifth team (Minnesota, Buffalo, Houston, New England, Washington). Klay left Golden State for Dallas and is now in Miami. Both can still hit the big shot."],
+   ["TE","Pat Freiermuth","PIT",52.9,null,"Davion Mitchell","PG","Off Night","Undrafted in this league and picked up off waivers. 19.0 in Week 5, then 2.1 in Week 6. Mitchell's 'Off Night' nickname is about his defense, but it works for Freiermuth too."],
+  ]},
+ {team:"williamaz", owner:"willyaz", rec:"2-4", pf:595, nba:"DAL",
+  pitch:"The future face, a famous vet, and plenty of Dallas. Mid-pack NBA starting five, mid-pack fantasy roster, and both are better than their record.",
+  five:[
+   ["RB","Bijan Robinson","ATL",117.5,2,"Cooper Flagg","SF","The franchise","Bijan went No. 2 here and Flagg went No. 1 in 2025. Both came in with 'generational' hype and are living up to it. Bijan had 34.3 in Week 3."],
+   ["WR","Davante Adams","LAR",87.0,58,"P.J. Washington","PF","Traded into a contender","Both got out of a rebuild and into a winner. Charlotte sent Washington to Dallas, and he helped carry the Mavs to the 2024 Finals. Adams went from Las Vegas to the Jets to the Rams. At 33 he's still good for a 35.5-point night."],
+   ["TE","Jake Ferguson","DAL",37.0,111,"Daniel Gafford","C","Dallas big","A Cowboy and a Maverick. Both are big safety valves the stars lean on. Ferguson's weeks: 1.6, 18.3, 8.8, 2.6, 3.4, 2.3. Not many of those nights so far."],
+   ["FLEX","Malik Nabers","NYG",81.9,27,"Kyrie Irving","PG","Back from the ACL","Both tore an ACL in 2025 and came back this season. Nabers needed a few weeks (9.9, 0.6, 5.1), then hit 20+ in three straight. Mavs fans are hoping Kyrie follows the same script."],
+   ["QB","Jordan Love","GB",106.9,170,"Max Christie","SG","Patience paid","Love sat three years behind Aaron Rodgers before getting the job. Christie was a second-round pick who developed slowly in LA before Dallas made him a starter. Love has been steady since Week 1, between 11.8 and 23.8 every week."],
+  ]},
+ {team:"Moik", owner:"Coolmark", rec:"1-5", pf:590, nba:"PHI",
+  pitch:"The No. 1 starting five in the NBA, on paper. Both preseason rankings put Philly first. Dak, Kyren, Puka and Kelce look like a contender on paper too. Then the games happen.",
+  five:[
+   ["QB","Dak Prescott","DAL",106.4,92,"Joel Embiid","C","The big contract","MVP-level talent, a huge contract, constant scrutiny, and a fan base still waiting on a deep playoff run. Dak has been steady (106.4), which is more than the record says."],
+   ["TE","Travis Kelce","KC",51.9,77,"LeBron James","PF","Living legends","At 37 and 41, both are still out there, and both are more famous than everyone else on their team combined. LeBron joined Philly this summer, while Kelce is in his 14th season in Kansas City."],
+   ["WR","Puka Nacua","LAR",73.3,8,"Tyrese Maxey","PG","Draft steals","Puka went 177th in 2023 and Maxey went 21st in 2020, and both were stars almost immediately. Puka missed two games and still had 29.2 in Week 5."],
+   ["RB","Kyren Williams","LAR",105.0,21,"Jaylen Brown","SF","Workhorse","105.0 points and a 31.7-point Week 4. Brown came to Philly as the second star, expected to carry a heavy load every night."],
+   ["FLEX","Denzel Boston","CLE",63.0,176,"VJ Edgecombe","SG","The kid","A 2026 rookie, taken 176th here, who's already a FLEX starter. Edgecombe went No. 3 in 2025 and starts next to a lineup of All-Stars."],
+  ]},
+ {team:"Team Mehta", owner:"sm123456", rec:"1-5", pf:584, nba:"GSW",
+  pitch:"The dynasty and its veterans. Mahomes and Curry have seven titles between them, and both are surrounded by vets in their 30s. Same record problem.",
+  five:[
+   ["QB","Patrick Mahomes","KC",94.1,110,"Stephen Curry","PG","The dynasty","Three Super Bowl rings, four NBA titles. Both changed how their sport is played. Mahomes has 94.1 in five games on a 1–5 team, which is what Curry in a down year feels like."],
+   ["RB","Christian McCaffrey","SF",109.0,3,"Draymond Green","PF","The whole system","Neither one fits in a single box. Draymond runs Golden State's offense, guards all five spots and sets the tone. CMC is the 49ers' run game and a big part of their passing game at once. Both carry heavy mileage into their 30s, and CMC still had 27.2 in Week 6."],
+   ["TE","Mark Andrews","BAL",34.6,138,"Gui Santos","SF","Overlooked on draft day","Andrews went in the third round in 2018 and became an All-Pro. Santos went 55th in 2022 and played his way into the starting five. Andrews' 2026 hasn't matched his résumé yet (34.6 points), but the track record is real."],
+   ["WR","Mike Evans","SF",75.5,59,"Al Horford","C","Late-career Bay Area move","Evans left Tampa after 12 seasons and signed with San Francisco at 33. Horford joined Golden State at 39. Neither has slowed down as much as you'd expect."],
+   ["FLEX","Michael Wilson","ARI",54.8,87,"Brandin Podziemski","SG","Bay Area college kids","Wilson played at Stanford and Podziemski at Santa Clara, about 15 miles apart. Both turned into useful starters without much hype. Wilson had 20.4 in Week 3."],
+  ]},
+ {team:"Pharaoh Joe", owner:"Bluefootedtoby", rec:"5-1", pf:568, nba:"IND",
+  pitch:"Winning games they had no business winning: 13th in points, 5–1 in the standings. The 2025 Pacers came back from deficits nobody comes back from and rode it to Game 7 of the Finals.",
+  five:[
+   ["QB","Joe Burrow","CIN",100.2,41,"Tyrese Haliburton","PG","Elite brain, injury scare","Burrow lost much of 2025 to turf toe, and Haliburton tore his Achilles in Game 7 of the 2025 Finals. Their offenses run through them, and Burrow has scored 23+ three straight weeks."],
+   ["FLEX","George Pickens","DAL",65.3,16,"Pascal Siakam","PF","Late pick, new team, top option","Pickens went 52nd in 2022 and was traded to Dallas. Siakam went 27th and was traded to Indiana. Both became the top option on their new team. Pickens had 23.5 in Week 5."],
+   ["WR","Zay Flowers","BAL",78.0,44,"Andrew Nembhard","SG","Small and tough","Neither is the biggest guy on the field, and both play bigger than their size. Flowers has two 20-point games and double digits in four of five."],
+   ["TE","Dalton Kincaid","BUF",50.0,69,"Aaron Nesmith","SF","The long way up","Kincaid started at FCS San Diego and became a first-round pick after transferring to Utah. Nesmith couldn't crack Boston's rotation, then became a starter and a big-moment shooter in Indiana. Kincaid opened the year with 15.5 and 19.0, and the ceiling is still there."],
+   ["RB","Rhamondre Stevenson","NE",57.9,72,"Ivica Zubac","C","Bruiser","Physical, unglamorous, gets the job done. Zubac came over at the deadline to do the dirty work, and Stevenson's 16-point weeks keep the lights on."],
+  ]},
+ {team:"Chaffers Eats Ass", owner:"Sean17977", rec:"2-4", pf:479, nba:"MEM",
+  pitch:"A rough start, lots of young pieces, one reliable vet. Memphis traded Ja Morant and is starting over around rookies. This roster has the fewest points in the league, but Stafford is still slinging.",
+  five:[
+   ["QB","Matthew Stafford","LAR",106.4,98,"Jerami Grant","SF","Vet on a rebuild","Stafford is the oldest starter here at 38, and 106.4 points is a real season. Grant is a well-traveled vet doing the same on a young roster."],
+   ["RB","Omarion Hampton","LAC",55.0,14,"Zach Edey","C","Big hopes, bad luck","Hampton went 14th in this draft and has 55.0. Edey came in at 7'4\" with big expectations, and his health is a question again. Both are better than they've shown."],
+   ["FLEX","Emanuel Wilson","SEA",54.3,null,"Cedric Coward","SG","Climbed every rung","Neither started anywhere near the big stage. Coward went from Division III Willamette to Eastern Washington to Washington State, then became a 2025 lottery pick. Wilson came out of Division II Fort Valley State undrafted and worked his way up from practice squads to Seattle's backfield. Wilson had 25.0 in Week 4."],
+   ["WR","Luther Burden","CHI",58.8,43,"Cameron Boozer","PF","Pedigree","Burden was a five-star recruit who stayed home at Missouri. Boozer is the son of two-time All-Star Carlos Boozer and followed him to Duke. Both arrived with big expectations, and Burden's 13.5 in Week 6 was his second-best week this year."],
+   ["TE","Harold Fannin","CLE",44.1,71,"Ty Jerome","PG","Made in Cleveland","Both turned heads in Cleveland. Fannin led all of college football in receiving yards as a tight end at a MAC school, then landed with the Browns. Jerome bounced through Phoenix, Oklahoma City and Golden State before his breakout season with the Cavs earned him a starting job. Fannin's 20.6 in Week 3 shows what he can do."],
+  ]},
+];
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+const ord = n => n + ({1:"st",2:"nd",3:"rd"}[n] || "th");
+
+document.getElementById("nav").innerHTML = TEAMS.map(t =>
+  `<a href="#${slug(t.team)}" style="--c1:${NBA[t.nba].c1}"><i></i>${esc(t.team)}</a>`).join("");
+
+document.getElementById("teams").innerHTML = TEAMS.map((t, i) => {
+  const n = NBA[t.nba];
+  const rows = t.five.map(([slot, fp, nfl, pts, pick, np, pos, tag, why]) => `
+    <li>
+      <span class="slot">${slot}</span>
+      <div class="who"><b>${esc(fp)}</b><span>${nfl} · ${pts.toFixed(1)} pts · ${pick ? "pick " + pick : "undrafted"}</span></div>
+      <span class="eq">↔</span>
+      <div class="who nbaguy"><b>${esc(np)}</b><span>${pos} · ${t.nba}</span></div>
+      <p class="why"><span class="tag">${esc(tag)}</span>${esc(why)}</p>
+    </li>`).join("");
+  return `
+  <section class="team" id="${slug(t.team)}" style="--c1:${n.c1};--c2:${n.c2};--c1-text:color-mix(in srgb, ${n.c1} 70%, var(--text))">
+    <div class="team-top">
+      <div>
+        <div class="rank">${ord(i + 1)} in points for</div>
+        <div class="fname">${esc(t.team)}</div>
+        <div class="owner">${esc(t.owner)}</div>
+      </div>
+      <div class="rec"><div class="big">${t.rec}</div><div class="small mono">${t.pf} PF</div></div>
+    </div>
+    <div class="nba">
+      <div class="badge">${t.nba}</div>
+      <div><h2>${n.name}</h2><p>${esc(t.pitch)}</p></div>
+    </div>
+    <ul class="five">${rows}</ul>
+  </section>`;
+}).join("");
+
+document.getElementById("nav").addEventListener("click", e => {
+  const a = e.target.closest("a");
+  if (!a) return;
+  e.preventDefault();
+  document.getElementById(a.getAttribute("href").slice(1)).scrollIntoView({behavior:"smooth", block:"start"});
+});
+const toTop = document.getElementById("totop");
+toTop.addEventListener("click", () => window.scrollTo({top:0, behavior:"smooth"}));
+const syncTop = () => toTop.classList.toggle("show", window.scrollY > 400);
+window.addEventListener("scroll", syncTop, {passive:true});
+syncTop();
+</script>
+</body>
+</html>
