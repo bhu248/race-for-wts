@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Make a WTS Team</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eef0e5; --surface:#ffffff; --surface-2:#e2e5d6;
+    --text:#211d15; --text-dim:#6d6a5a;
+    --accent:#7a2331; --accent-ink:#fbecee;
+    --good:#1f7a4d; --good-soft:#dcefe3;
+    --gold:#9a6b00; --gold-soft:#f6ebc8;
+    --border:#d8d5c3;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#1a1611; --surface:#241f19; --surface-2:#2e2822;
+      --text:#f2ede2; --text-dim:#a89f8e;
+      --accent:#d98a6f; --accent-ink:#241108;
+      --good:#4caf7d; --good-soft:#1d3226;
+      --gold:#e3b74a; --gold-soft:#3a3018;
+      --border:#3a3327;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#1a1611; --surface:#241f19; --surface-2:#2e2822;
+    --text:#f2ede2; --text-dim:#a89f8e;
+    --accent:#d98a6f; --accent-ink:#241108;
+    --good:#4caf7d; --good-soft:#1d3226;
+    --gold:#e3b74a; --gold-soft:#3a3018;
+    --border:#3a3327;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"Public Sans", ui-sans-serif, system-ui, sans-serif;
+    min-height:100vh; padding:34px 16px 60px;
+  }
+  .num{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-variant-numeric:tabular-nums; }
+  .wrap{ max-width:880px; margin:0 auto; }
+  [hidden]{ display:none !important; }
+
+  .eyebrow{
+    font-family:"IBM Plex Mono", monospace; font-size:0.66rem; letter-spacing:0.14em;
+    text-transform:uppercase; color:var(--accent); margin:0 0 6px;
+  }
+  h1{
+    font-family:"Fraunces", Georgia, serif; font-weight:600;
+    font-size:clamp(2.1rem, 7vw, 2.9rem); line-height:0.98; margin:0; text-wrap:balance;
+  }
+  h2{ font-family:"Fraunces", Georgia, serif; font-weight:600; font-size:1.25rem; margin:0; }
+  .lede{ margin:10px 0 0; color:var(--text-dim); font-size:0.95rem; line-height:1.5; max-width:56ch; }
+  .bests{ margin:14px 0 0; font-size:0.84rem; color:var(--text-dim); }
+  .bests b{ color:var(--text); }
+
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:18px; box-shadow:0 1px 2px rgba(0,0,0,0.05);
+  }
+  .tag{
+    display:inline-block; font-family:"IBM Plex Mono", monospace; font-size:0.62rem; font-weight:600;
+    letter-spacing:0.06em; text-transform:uppercase; border-radius:99px; padding:3px 8px;
+    background:var(--surface-2); color:var(--text-dim); white-space:nowrap;
+  }
+  .tag.gold{ background:var(--gold-soft); color:var(--gold); }
+  .tag.good{ background:var(--good-soft); color:var(--good); }
+
+  .btn{
+    font-family:"IBM Plex Mono", monospace; font-size:0.76rem; font-weight:600; letter-spacing:0.04em;
+    text-transform:uppercase; background:var(--accent); color:var(--accent-ink);
+    border:1px solid var(--accent); border-radius:8px; padding:10px 16px; cursor:pointer;
+  }
+  .btn:hover{ filter:brightness(1.08); }
+  .btn:active{ transform:scale(0.98); }
+  .btn:focus-visible, .pick:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  .game{ display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:16px; align-items:start; margin-top:24px; }
+  @media (max-width: 760px){ .game{ grid-template-columns:minmax(0,1fr); } .lineup-card{ order:-1; } }
+
+  .deal-head{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:4px; }
+  .round{ font-family:"IBM Plex Mono", monospace; font-size:0.7rem; color:var(--text-dim); white-space:nowrap; }
+  .deal-sub{ font-size:0.82rem; color:var(--text-dim); margin:0 0 14px; }
+
+  .players{ list-style:none; margin:0; padding:0; display:grid; gap:6px; }
+  .pick{
+    width:100%; display:flex; align-items:center; gap:10px; text-align:left;
+    font:inherit; color:var(--text); background:var(--surface); cursor:pointer;
+    border:1px solid var(--border); border-radius:9px; padding:9px 12px;
+  }
+  .pick:hover:not(:disabled){ border-color:var(--accent); }
+  .pick:disabled{ opacity:0.35; cursor:default; }
+  .pick .pos{ width:3.4em; flex-shrink:0; }
+  .pick .nm{ flex:1; min-width:0; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pick .tm{ font-family:"IBM Plex Mono", monospace; font-size:0.72rem; color:var(--text-dim); }
+  .pick .to{ font-family:"IBM Plex Mono", monospace; font-size:0.66rem; color:var(--accent); width:4.6em; text-align:right; flex-shrink:0; }
+  .pick:disabled .to{ visibility:hidden; }
+
+  .slots{ list-style:none; margin:10px 0 0; padding:0; display:grid; gap:2px; }
+  .slots li{ display:flex; gap:8px; align-items:baseline; font-size:0.85rem; padding:6px 0; border-bottom:1px dashed var(--border); }
+  .slots li:last-child{ border-bottom:none; }
+  .slots .sl{ font-family:"IBM Plex Mono", monospace; font-size:0.66rem; font-weight:600; color:var(--text-dim); width:3.6em; flex-shrink:0; }
+  .slots .nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .slots .from{ display:block; font-size:0.72rem; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; }
+  .slots .nfl{ font-family:"IBM Plex Mono", monospace; font-size:0.7rem; color:var(--text-dim); font-weight:400; }
+  .slots .empty{ color:var(--text-dim); font-style:italic; }
+  .slots .pts{ font-weight:600; }
+  .slots li.flash{ animation:flash 0.6s ease-out; }
+  @keyframes flash{ from{ background:var(--gold-soft); } to{ background:transparent; } }
+
+  /* ---------- results ---------- */
+  .hero{ text-align:center; padding:28px 18px 24px; margin-top:24px; }
+  .total{ font-family:"Fraunces", Georgia, serif; font-weight:700; font-size:clamp(3.2rem, 15vw, 5rem); line-height:1; margin:6px 0 10px; }
+  .hero .sub{ color:var(--text-dim); margin:0 auto; max-width:44ch; line-height:1.5; font-size:0.92rem; }
+  .compare{ display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-top:20px; }
+  @media (max-width: 560px){ .compare{ grid-template-columns:1fr; } }
+  .stat{ background:var(--surface-2); border-radius:10px; padding:10px 12px; text-align:left; }
+  .stat .k{ font-size:0.72rem; color:var(--text-dim); }
+  .stat .v{ font-size:1.15rem; font-weight:600; margin-top:2px; }
+  .stat .d{ font-size:0.72rem; color:var(--text-dim); margin-top:2px; }
+  .results{ margin-top:16px; }
+  .results .slots li{ align-items:center; }
+  .actions{ display:flex; justify-content:center; gap:8px; margin-top:20px; }
+
+  .foot{ margin-top:28px; font-size:0.74rem; color:var(--text-dim); }
+  .foot a{ color:inherit; }
+  @media (prefers-reduced-motion: reduce){ .slots li.flash{ animation:none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow" id="eyebrow"></p>
+  <h1>Make a WTS Team</h1>
+  <p class="lede" id="lede"></p>
+  <p class="bests" id="bests"></p>
+
+  <section id="play" class="game">
+    <div class="card">
+      <div class="deal-head">
+        <h2 id="dealt"></h2>
+        <span class="round" id="round"></span>
+      </div>
+      <p class="deal-sub">Take one player. Points stay hidden until your lineup is full.</p>
+      <ul class="players" id="players"></ul>
+    </div>
+    <div class="card lineup-card">
+      <h2>Your lineup</h2>
+      <ul class="slots" id="slots"></ul>
+    </div>
+  </section>
+
+  <section id="done" hidden>
+    <div class="card hero">
+      <p class="eyebrow" id="done-eyebrow">Final score</p>
+      <div class="total num" id="total">0.00</div>
+      <p class="sub" id="verdict"></p>
+      <div class="compare" id="compare"></div>
+    </div>
+    <div class="card results">
+      <h2>Your lineup</h2>
+      <ul class="slots" id="result-slots"></ul>
+    </div>
+    <div class="actions"><button class="btn" id="again">Play again</button></div>
+  </section>
+
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+const DATA = {"season":"2026","week":9,"partial":false,"built":"2026-11-10 14:46 UTC","lineup":["QB","RB","RB","WR","WR","TE","FLEX","FLEX","K","DEF"],"teams":[{"name":"Anon Akron Billionaire","pts":129.48,"players":[{"n":"Brock Purdy","p":"QB","t":"SF","pts":25.78,"s":true},{"n":"Sam Darnold","p":"QB","t":"SEA","pts":0.0,"s":false},{"n":"Chuba Hubbard","p":"RB","t":"CAR","pts":11.1,"s":true},{"n":"Jahmyr Gibbs","p":"RB","t":"DET","pts":13.4,"s":true},{"n":"Ollie Gordon II","p":"RB","t":"MIA","pts":6.9,"s":true},{"n":"Tyler Allgeier","p":"RB","t":"ARI","pts":5.6,"s":true},{"n":"Jadarian Price","p":"RB","t":"SEA","pts":9.8,"s":false},{"n":"Woody Marks","p":"RB","t":"HOU","pts":7.9,"s":false},{"n":"Chris Olave","p":"WR","t":"NO","pts":13.3,"s":true},{"n":"Josh Downs","p":"WR","t":"IND","pts":3.9,"s":true},{"n":"Carnell Tate","p":"WR","t":"TEN","pts":0.0,"s":false},{"n":"Courtland Sutton","p":"WR","t":"DEN","pts":13.0,"s":false},{"n":"Brock Bowers","p":"TE","t":"LV","pts":19.8,"s":true},{"n":"Juwan Johnson","p":"TE","t":"NO","pts":10.4,"s":false},{"n":"Cam Little","p":"K","t":"JAX","pts":19.1,"s":true},{"n":"Kansas City Chiefs","p":"DEF","t":"KC","pts":10.6,"s":true}]},{"name":"bigBurger221","pts":88.36,"players":[{"n":"Jayden Daniels","p":"QB","t":"WAS","pts":13.56,"s":true},{"n":"Geno Smith","p":"QB","t":"NYJ","pts":4.9,"s":false},{"n":"Ashton Jeanty","p":"RB","t":"LV","pts":4.5,"s":true},{"n":"D'Andre Swift","p":"RB","t":"CHI","pts":3.1,"s":true},{"n":"Rachaad White","p":"RB","t":"WAS","pts":6.4,"s":true},{"n":"Jaxon Smith-Njigba","p":"WR","t":"SEA","pts":8.6,"s":true},{"n":"Keenan Allen","p":"WR","t":"IND","pts":4.6,"s":true},{"n":"Tetairoa McMillan","p":"WR","t":"CAR","pts":13.6,"s":true},{"n":"Dontayvion Wicks","p":"WR","t":"PHI","pts":0.0,"s":false},{"n":"Jahan Dotson","p":"WR","t":"ATL","pts":2.6,"s":false},{"n":"Kalif Raymond","p":"WR","t":"CHI","pts":4.7,"s":false},{"n":"Romeo Doubs","p":"WR","t":"NE","pts":0.0,"s":false},{"n":"Wan'Dale Robinson","p":"WR","t":"TEN","pts":0.0,"s":false},{"n":"Tyler Warren","p":"TE","t":"IND","pts":6.4,"s":true},{"n":"Michael Mayer","p":"TE","t":"LV","pts":4.2,"s":false},{"n":"Eddy Pineiro","p":"K","t":"SF","pts":8.5,"s":true},{"n":"San Francisco 49ers","p":"DEF","t":"SF","pts":19.1,"s":true}]},{"name":"BigWangs","pts":109.96,"players":[{"n":"Caleb Williams","p":"QB","t":"CHI","pts":16.26,"s":true},{"n":"Tyler Shough","p":"QB","t":"NO","pts":16.2,"s":false},{"n":"Bhayshul Tuten","p":"RB","t":"JAX","pts":8.9,"s":true},{"n":"Javonte Williams","p":"RB","t":"DAL","pts":20.4,"s":true},{"n":"Quinshon Judkins","p":"RB","t":"CLE","pts":5.0,"s":true},{"n":"Amon-Ra St. Brown","p":"WR","t":"DET","pts":12.6,"s":true},{"n":"DJ Moore","p":"WR","t":"BUF","pts":5.1,"s":true},{"n":"Parker Washington","p":"WR","t":"JAX","pts":13.1,"s":true},{"n":"Alec Pierce","p":"WR","t":"IND","pts":0.0,"s":false},{"n":"Cooper Kupp","p":"WR","t":"SEA","pts":4.7,"s":false},{"n":"DeMario Douglas","p":"WR","t":"NE","pts":12.7,"s":false},{"n":"Ryan Flournoy","p":"WR","t":"DAL","pts":6.3,"s":false},{"n":"Dallas Goedert","p":"TE","t":"PHI","pts":7.5,"s":true},{"n":"Tyler Higbee","p":"TE","t":"LAR","pts":1.8,"s":false},{"n":"Jason Myers","p":"K","t":"SEA","pts":6.5,"s":true},{"n":"Houston Texans","p":"DEF","t":"HOU","pts":14.6,"s":true},{"n":"Tampa Bay Buccaneers","p":"DEF","t":"TB","pts":9.8,"s":false}]},{"name":"Chaffers Eats Ass","pts":75.72,"players":[{"n":"Malik Willis","p":"QB","t":"MIA","pts":3.32,"s":true},{"n":"Matthew Stafford","p":"QB","t":"LAR","pts":11.72,"s":false},{"n":"Jonah Coleman","p":"RB","t":"DEN","pts":16.8,"s":true},{"n":"Mike Washington Jr.","p":"RB","t":"LV","pts":-0.3,"s":true},{"n":"Omarion Hampton","p":"RB","t":"LAC","pts":6.0,"s":true},{"n":"MarShawn Lloyd","p":"RB","t":"GB","pts":0.0,"s":false},{"n":"Travis Etienne Jr.","p":"RB","t":"NO","pts":0.0,"s":false},{"n":"Antonio Williams","p":"WR","t":"WAS","pts":4.0,"s":true},{"n":"Chris Bell","p":"WR","t":"MIA","pts":0.0,"s":true},{"n":"Luther Burden III","p":"WR","t":"CHI","pts":18.2,"s":true},{"n":"A.J. Brown","p":"WR","t":"NE","pts":0.0,"s":false},{"n":"Germie Bernard","p":"WR","t":"PIT","pts":0.0,"s":false},{"n":"Konata Mumpfield","p":"WR","t":"LAR","pts":3.0,"s":false},{"n":"Marvin Harrison Jr.","p":"WR","t":"HOU","pts":3.0,"s":false},{"n":"Harold Fannin Jr.","p":"TE","t":"CLE","pts":11.2,"s":true},{"n":"Trey Smack","p":"K","t":"GB","pts":17.0,"s":true},{"n":"New England Patriots","p":"DEF","t":"NE","pts":-0.5,"s":true}]},{"name":"Claude Antonelli","pts":58.94,"players":[{"n":"Bryce Young","p":"QB","t":"CAR","pts":20.84,"s":true},{"n":"Aaron Rodgers","p":"QB","t":"PIT","pts":0.0,"s":false},{"n":"Jaxson Dart","p":"QB","t":"NYG","pts":0.0,"s":false},{"n":"Jonathan Taylor","p":"RB","t":"IND","pts":7.9,"s":true},{"n":"Josh Jacobs","p":"RB","t":"GB","pts":0.0,"s":true},{"n":"RJ Harvey","p":"RB","t":"DEN","pts":0.0,"s":true},{"n":"Keon Coleman","p":"WR","t":"BUF","pts":3.2,"s":true},{"n":"Rashod Bateman","p":"WR","t":"BAL","pts":1.1,"s":true},{"n":"Stefon Diggs","p":"WR","t":"WAS","pts":6.6,"s":true},{"n":"Brandin Cooks","p":"WR","t":"SF","pts":3.5,"s":false},{"n":"Nico Collins","p":"WR","t":"HOU","pts":13.5,"s":false},{"n":"Tucker Kraft","p":"TE","t":"GB","pts":1.4,"s":true},{"n":"Kenyon Sadiq","p":"TE","t":"NYJ","pts":6.9,"s":false},{"n":"Pat Freiermuth","p":"TE","t":"PIT","pts":0.0,"s":false},{"n":"Evan McPherson","p":"K","t":"CIN","pts":14.0,"s":true},{"n":"Cairo Santos","p":"K","t":"CHI","pts":9.8,"s":false},{"n":"Minnesota Vikings","p":"DEF","t":"MIN","pts":3.9,"s":true}]},{"name":"Hakuna Matata","pts":89.2,"players":[{"n":"Jared Goff","p":"QB","t":"DET","pts":4.8,"s":true},{"n":"Braelon Allen","p":"RB","t":"NYJ","pts":5.4,"s":true},{"n":"Jordan Mason","p":"RB","t":"MIN","pts":5.2,"s":true},{"n":"Emmett Johnson","p":"RB","t":"KC","pts":9.4,"s":false},{"n":"Kaelon Black","p":"RB","t":"SF","pts":7.0,"s":false},{"n":"Zach Charbonnet","p":"RB","t":"SEA","pts":9.1,"s":false},{"n":"Adonai Mitchell","p":"WR","t":"NYJ","pts":0.0,"s":true},{"n":"CeeDee Lamb","p":"WR","t":"DAL","pts":29.5,"s":true},{"n":"Jaylen Waddle","p":"WR","t":"DEN","pts":2.7,"s":true},{"n":"Tee Higgins","p":"WR","t":"CIN","pts":17.7,"s":true},{"n":"Tre Tucker","p":"WR","t":"LV","pts":7.5,"s":false},{"n":"Sam LaPorta","p":"TE","t":"DET","pts":5.2,"s":true},{"n":"Hunter Henry","p":"TE","t":"NE","pts":5.0,"s":false},{"n":"Terrance Ferguson","p":"TE","t":"LAR","pts":0.0,"s":false},{"n":"Wil Lutz","p":"K","t":"DEN","pts":9.8,"s":true},{"n":"Chris Boswell","p":"K","t":"PIT","pts":0.0,"s":false},{"n":"Cleveland Browns","p":"DEF","t":"CLE","pts":8.9,"s":true}]},{"name":"lynnbear","pts":89.66,"players":[{"n":"Trevor Lawrence","p":"QB","t":"JAX","pts":13.58,"s":true},{"n":"Kirk Cousins","p":"QB","t":"LV","pts":15.14,"s":false},{"n":"Chase Brown","p":"RB","t":"CIN","pts":9.0,"s":true},{"n":"Derrick Henry","p":"RB","t":"BAL","pts":5.58,"s":true},{"n":"Brian Robinson Jr.","p":"RB","t":"ATL","pts":0.0,"s":false},{"n":"Jaylen Warren","p":"RB","t":"PIT","pts":0.0,"s":false},{"n":"Caleb Douglas","p":"WR","t":"MIA","pts":10.0,"s":true},{"n":"Emeka Egbuka","p":"WR","t":"TB","pts":5.4,"s":true},{"n":"Rashee Rice","p":"WR","t":"KC","pts":7.4,"s":true},{"n":"Xavier Worthy","p":"WR","t":"KC","pts":7.8,"s":false},{"n":"Colston Loveland","p":"TE","t":"CHI","pts":7.4,"s":true},{"n":"George Kittle","p":"TE","t":"SF","pts":7.8,"s":true},{"n":"Ka'imi Fairbairn","p":"K","t":"HOU","pts":17.8,"s":true},{"n":"Spencer Shrader","p":"K","t":"IND","pts":17.6,"s":false},{"n":"Detroit Lions","p":"DEF","t":"DET","pts":5.7,"s":true},{"n":"Pittsburgh Steelers","p":"DEF","t":"PIT","pts":0.0,"s":false}]},{"name":"Moik","pts":116.3,"players":[{"n":"Dak Prescott","p":"QB","t":"DAL","pts":19.0,"s":true},{"n":"Kendre Miller","p":"RB","t":"","pts":0.0,"s":true},{"n":"Kyren Williams","p":"RB","t":"LAR","pts":7.6,"s":true},{"n":"Breece Hall","p":"RB","t":"NYJ","pts":10.2,"s":false},{"n":"Samaje Perine","p":"RB","t":"CIN","pts":4.3,"s":false},{"n":"Denzel Boston","p":"WR","t":"CLE","pts":12.8,"s":true},{"n":"Puka Nacua","p":"WR","t":"LAR","pts":29.0,"s":true},{"n":"Rome Odunze","p":"WR","t":"CHI","pts":14.0,"s":true},{"n":"Jordan Addison","p":"WR","t":"MIN","pts":3.8,"s":false},{"n":"Terry McLaurin","p":"WR","t":"WAS","pts":0.0,"s":false},{"n":"Mike Gesicki","p":"TE","t":"CIN","pts":2.1,"s":true},{"n":"Travis Kelce","p":"TE","t":"KC","pts":15.3,"s":true},{"n":"Brenton Strange","p":"TE","t":"JAX","pts":3.2,"s":false},{"n":"Brandon Aubrey","p":"K","t":"DAL","pts":9.5,"s":true},{"n":"Jacksonville Jaguars","p":"DEF","t":"JAX","pts":7.0,"s":true}]},{"name":"Pharaoh Joe","pts":91.24,"players":[{"n":"Joe Burrow","p":"QB","t":"CIN","pts":28.54,"s":true},{"n":"Bo Nix","p":"QB","t":"DEN","pts":15.68,"s":false},{"n":"Blake Corum","p":"RB","t":"LAR","pts":11.8,"s":true},{"n":"Devin Singletary","p":"RB","t":"NYG","pts":4.9,"s":true},{"n":"Rhamondre Stevenson","p":"RB","t":"NE","pts":14.3,"s":true},{"n":"Saquon Barkley","p":"RB","t":"PHI","pts":8.2,"s":true},{"n":"Kimani Vidal","p":"RB","t":"LAC","pts":4.1,"s":false},{"n":"George Pickens","p":"WR","t":"DAL","pts":0.0,"s":true},{"n":"Zay Flowers","p":"WR","t":"BAL","pts":3.8,"s":true},{"n":"Rashid Shaheed","p":"WR","t":"SEA","pts":0.0,"s":false},{"n":"Roman Wilson","p":"WR","t":"PIT","pts":0.0,"s":false},{"n":"Savion Williams","p":"WR","t":"GB","pts":11.3,"s":false},{"n":"Dalton Kincaid","p":"TE","t":"BUF","pts":4.3,"s":true},{"n":"AJ Barner","p":"TE","t":"SEA","pts":14.0,"s":false},{"n":"Matt Gay","p":"K","t":"LV","pts":7.0,"s":true},{"n":"Harrison Butker","p":"K","t":"KC","pts":4.0,"s":false},{"n":"Seattle Seahawks","p":"DEF","t":"SEA","pts":8.4,"s":true}]},{"name":"SgtGigglesIV","pts":107.86,"players":[{"n":"C.J. Stroud","p":"QB","t":"HOU","pts":35.86,"s":true},{"n":"Baker Mayfield","p":"QB","t":"TB","pts":7.72,"s":false},{"n":"J.K. Dobbins","p":"RB","t":"DEN","pts":2.7,"s":true},{"n":"James Cook III","p":"RB","t":"BUF","pts":16.7,"s":true},{"n":"David Montgomery","p":"RB","t":"HOU","pts":0.0,"s":false},{"n":"Zonovan Knight","p":"RB","t":"ARI","pts":0.0,"s":false},{"n":"Drake London","p":"WR","t":"ATL","pts":9.3,"s":true},{"n":"Ladd McConkey","p":"WR","t":"LAC","pts":0.0,"s":true},{"n":"Malik Washington","p":"WR","t":"MIA","pts":3.1,"s":true},{"n":"Matthew Golden","p":"WR","t":"GB","pts":27.4,"s":true},{"n":"DK Metcalf","p":"WR","t":"PIT","pts":0.0,"s":false},{"n":"Deebo Samuel Sr.","p":"WR","t":"SF","pts":0.0,"s":false},{"n":"T.J. Hockenson","p":"TE","t":"MIN","pts":5.3,"s":true},{"n":"Isaiah Likely","p":"TE","t":"NYG","pts":13.8,"s":false},{"n":"Will Reichard","p":"K","t":"MIN","pts":9.6,"s":true},{"n":"Baltimore Ravens","p":"DEF","t":"BAL","pts":-2.1,"s":true}]},{"name":"Team Mehta","pts":93.68,"players":[{"n":"Patrick Mahomes","p":"QB","t":"KC","pts":15.98,"s":true},{"n":"Jacoby Brissett","p":"QB","t":"BAL","pts":0.0,"s":false},{"n":"Alvin Kamara","p":"RB","t":"NO","pts":6.4,"s":true},{"n":"Chris Rodriguez Jr.","p":"RB","t":"JAX","pts":10.2,"s":true},{"n":"Christian McCaffrey","p":"RB","t":"SF","pts":21.7,"s":true},{"n":"Cam Skattebo","p":"RB","t":"NYG","pts":0.0,"s":false},{"n":"Jeremiyah Love","p":"RB","t":"ARI","pts":0.0,"s":false},{"n":"Brian Thomas Jr.","p":"WR","t":"JAX","pts":0.0,"s":true},{"n":"Ja'Kobi Lane","p":"WR","t":"BAL","pts":0.0,"s":true},{"n":"Michael Wilson","p":"WR","t":"ARI","pts":9.0,"s":true},{"n":"Isaac TeSlaa","p":"WR","t":"DET","pts":1.4,"s":false},{"n":"Mike Evans","p":"WR","t":"SF","pts":0.0,"s":false},{"n":"Mark Andrews","p":"TE","t":"BAL","pts":2.4,"s":true},{"n":"Jake Bates","p":"K","t":"DET","pts":15.6,"s":true},{"n":"Tyler Bass","p":"K","t":"BUF","pts":14.1,"s":false},{"n":"Los Angeles Rams","p":"DEF","t":"LAR","pts":12.4,"s":true}]},{"name":"vnkn","pts":108.06,"players":[{"n":"Josh Allen","p":"QB","t":"BUF","pts":11.86,"s":true},{"n":"Bucky Irving","p":"RB","t":"TB","pts":26.0,"s":true},{"n":"Dylan Sampson","p":"RB","t":"CLE","pts":6.3,"s":true},{"n":"Kyle Monangai","p":"RB","t":"CHI","pts":0.0,"s":false},{"n":"Tony Pollard","p":"RB","t":"TEN","pts":0.0,"s":false},{"n":"Chris Godwin Jr.","p":"WR","t":"TB","pts":3.8,"s":true},{"n":"Ja'Marr Chase","p":"WR","t":"CIN","pts":26.5,"s":true},{"n":"Jalen Coker","p":"WR","t":"CAR","pts":4.6,"s":true},{"n":"Jameson Williams","p":"WR","t":"DET","pts":4.5,"s":true},{"n":"Jakobi Meyers","p":"WR","t":"JAX","pts":8.5,"s":false},{"n":"KC Concepcion Jr.","p":"WR","t":"CLE","pts":16.8,"s":false},{"n":"Trey McBride","p":"TE","t":"ARI","pts":8.4,"s":true},{"n":"Dalton Schultz","p":"TE","t":"HOU","pts":5.2,"s":false},{"n":"Brandon McManus","p":"K","t":"LAR","pts":8.3,"s":true},{"n":"Denver Broncos","p":"DEF","t":"DEN","pts":7.8,"s":true},{"n":"Cincinnati Bengals","p":"DEF","t":"CIN","pts":0.1,"s":false}]},{"name":"Volkswagen Jettas","pts":120.66,"players":[{"n":"Drake Maye","p":"QB","t":"NE","pts":19.26,"s":true},{"n":"Lamar Jackson","p":"QB","t":"BAL","pts":0.0,"s":false},{"n":"Aaron Jones Sr.","p":"RB","t":"MIN","pts":2.6,"s":true},{"n":"Kenneth Walker III","p":"RB","t":"KC","pts":34.3,"s":true},{"n":"Jacory Croskey-Merritt","p":"RB","t":"WAS","pts":0.0,"s":false},{"n":"Seth McGowan","p":"RB","t":"IND","pts":10.7,"s":false},{"n":"Christian Watson","p":"WR","t":"GB","pts":26.6,"s":true},{"n":"Devaughn Vele","p":"WR","t":"NO","pts":2.7,"s":true},{"n":"Justin Jefferson","p":"WR","t":"MIN","pts":7.3,"s":true},{"n":"Khalil Shakir","p":"WR","t":"BUF","pts":7.8,"s":true},{"n":"De'Zhaun Stribling","p":"WR","t":"SF","pts":0.0,"s":false},{"n":"Garrett Wilson","p":"WR","t":"NYJ","pts":0.0,"s":false},{"n":"Jordyn Tyson","p":"WR","t":"NO","pts":4.0,"s":false},{"n":"Tank Dell","p":"WR","t":"HOU","pts":18.0,"s":false},{"n":"Kyle Pitts Sr.","p":"TE","t":"ATL","pts":3.8,"s":true},{"n":"Nick Folk","p":"K","t":"ATL","pts":4.1,"s":true},{"n":"Chicago Bears","p":"DEF","t":"CHI","pts":12.2,"s":true}]},{"name":"williamaz","pts":132.18,"players":[{"n":"Jordan Love","p":"QB","t":"GB","pts":34.68,"s":true},{"n":"Justin Herbert","p":"QB","t":"LAC","pts":7.42,"s":false},{"n":"Bijan Robinson","p":"RB","t":"ATL","pts":23.2,"s":true},{"n":"Kenny Gainwell","p":"RB","t":"TB","pts":9.1,"s":true},{"n":"Rico Dowdle","p":"RB","t":"PIT","pts":0.0,"s":false},{"n":"Tank Bigsby","p":"RB","t":"PHI","pts":0.0,"s":false},{"n":"TreVeyon Henderson","p":"RB","t":"NE","pts":0.0,"s":false},{"n":"Makai Lemon","p":"WR","t":"PHI","pts":9.1,"s":true},{"n":"Malik Nabers","p":"WR","t":"NYG","pts":6.3,"s":true},{"n":"Omar Cooper Jr.","p":"WR","t":"NYJ","pts":9.8,"s":true},{"n":"Davante Adams","p":"WR","t":"LAR","pts":0.0,"s":false},{"n":"DeVonta Smith","p":"WR","t":"PHI","pts":0.0,"s":false},{"n":"Tre' Harris","p":"WR","t":"LAC","pts":2.1,"s":false},{"n":"Chig Okonkwo","p":"TE","t":"WAS","pts":8.2,"s":true},{"n":"Jake Ferguson","p":"TE","t":"DAL","pts":9.1,"s":true},{"n":"Chase McLaughlin","p":"K","t":"TB","pts":10.5,"s":true},{"n":"Philadelphia Eagles","p":"DEF","t":"PHI","pts":12.2,"s":true}]}]};
+
+const ELIGIBLE = {
+  QB:["QB"], RB:["RB"], WR:["WR"], TE:["TE"], K:["K"], DEF:["DEF"],
+  FLEX:["RB","WR","TE"], WRRB_FLEX:["RB","WR"], REC_FLEX:["WR","TE"], SUPER_FLEX:["QB","RB","WR","TE"],
+};
+const SLOT_LABEL = { WRRB_FLEX:"W/R", REC_FLEX:"W/T", SUPER_FLEX:"SFLX" };
+const STORE_KEY = "wts-team-bests";
+const $ = id => document.getElementById(id);
+const fmt = n => n.toFixed(2);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const slotLabel = s => SLOT_LABEL[s] || s;
+const fits = (slot, pos) => (ELIGIBLE[slot] || [slot]).includes(pos);
+
+let game;
+
+function loadBests(){
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch(e){ return {}; }
+}
+function saveBests(b){
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(b)); } catch(e){}
+}
+function weekKey(){ return DATA.season + "-" + DATA.week; }
+
+function renderBests(){
+  const b = loadBests(), wk = (b.weeks || {})[weekKey()], all = b.all;
+  const parts = [];
+  parts.push(wk ? `Your week ${DATA.week} best: <b class="num">${fmt(wk)}</b>` : `No week ${DATA.week} score yet`);
+  if (all) parts.push(`All-time best: <b class="num">${fmt(all.score)}</b> (week ${all.week})`);
+  if (b.plays) parts.push(`${b.plays} game${b.plays === 1 ? "" : "s"} played`);
+  $("bests").innerHTML = parts.join(" · ");
+}
+
+// Exact-position slot first, then the narrowest flex that takes it.
+function slotFor(pos){
+  const open = game.lineup.map((s, i) => i).filter(i => !game.filled[i] && fits(game.lineup[i], pos));
+  open.sort((a, b) => (ELIGIBLE[game.lineup[a]] || [1]).length - (ELIGIBLE[game.lineup[b]] || [1]).length);
+  return open.length ? open[0] : -1;
+}
+
+function dealNext(){
+  const useful = t => t.players.some(p => slotFor(p.p) >= 0);
+  let pool = DATA.teams.filter(t => !game.seen.has(t.name) && useful(t));
+  if (!pool.length) pool = DATA.teams.filter(useful);
+  game.team = pool[Math.floor(Math.random() * pool.length)];
+  game.seen.add(game.team.name);
+  renderDeal();
+}
+
+function renderDeal(){
+  const round = game.filled.filter(Boolean).length + 1;
+  $("dealt").textContent = game.team.name;
+  $("round").textContent = `Round ${round} of ${game.lineup.length}`;
+  $("players").innerHTML = game.team.players.map((p, i) => {
+    const s = slotFor(p.p);
+    return `<li><button class="pick" data-i="${i}" ${s < 0 ? "disabled" : ""}>
+      <span class="pos"><span class="tag">${p.p}</span></span>
+      <span class="nm">${esc(p.n)}</span>
+      <span class="tm">${esc(p.t)}</span>
+      <span class="to">${s >= 0 ? "→ " + slotLabel(game.lineup[s]) : ""}</span>
+    </button></li>`;
+  }).join("");
+}
+
+function renderSlots(target, reveal, flashIdx){
+  target.innerHTML = game.lineup.map((s, i) => {
+    const f = game.filled[i];
+    const body = f
+      ? `<span class="nm">${esc(f.n)} <span class="nfl">${esc(f.t)}</span><span class="from">from ${esc(f.from)}</span></span>`
+      : `<span class="nm empty">empty</span>`;
+    const pts = reveal && f ? `<span class="pts num" data-pts="${i}">–</span>` : "";
+    return `<li class="${i === flashIdx ? "flash" : ""}"><span class="sl">${slotLabel(s)}</span>${body}${pts}</li>`;
+  }).join("");
+}
+
+function pick(i){
+  const p = game.team.players[i], s = slotFor(p.p);
+  if (s < 0) return;
+  game.filled[s] = { ...p, from: game.team.name, round: game.rounds.length };
+  game.rounds.push(game.team);
+  renderSlots($("slots"), false, s);
+  if (game.filled.every(Boolean)) finish(); else dealNext();
+}
+
+// Best lineup possible from the same deals, one player per deal (DP over filled-slot bitmask).
+function bestPossible(){
+  const n = game.lineup.length;
+  let dp = new Map([[0, 0]]);
+  for (const team of game.rounds){
+    const next = new Map();
+    for (const [mask, val] of dp){
+      for (let s = 0; s < n; s++){
+        if (mask & (1 << s)) continue;
+        let best = -Infinity;
+        for (const p of team.players) if (fits(game.lineup[s], p.p)) best = Math.max(best, p.pts);
+        if (best === -Infinity) continue;
+        const m = mask | (1 << s), v = val + best;
+        if (!next.has(m) || next.get(m) < v) next.set(m, v);
+      }
+    }
+    dp = next;
+  }
+  return dp.get((1 << n) - 1) ?? 0;
+}
+
+function finish(){
+  const total = game.filled.reduce((a, f) => a + f.pts, 0);
+  const best = bestPossible();
+  const top = DATA.teams.reduce((a, t) => t.pts > a.pts ? t : a);
+
+  const b = loadBests();
+  b.weeks = b.weeks || {};
+  const prevWeek = b.weeks[weekKey()];
+  const newWeekBest = prevWeek === undefined || total > prevWeek;
+  const newAllBest = !b.all || total > b.all.score;
+  if (newWeekBest) b.weeks[weekKey()] = total;
+  if (newAllBest) b.all = { score: total, week: DATA.week };
+  b.plays = (b.plays || 0) + 1;
+  saveBests(b);
+
+  $("play").hidden = true;
+  $("done").hidden = false;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  const beatTop = total > top.pts;
+  $("done-eyebrow").innerHTML = newAllBest && b.plays > 1
+    ? `<span class="tag gold">New personal best</span>`
+    : newWeekBest && prevWeek !== undefined ? `<span class="tag gold">New week ${DATA.week} best</span>` : "Final score";
+  $("verdict").textContent = beatTop
+    ? `That beats the real week ${DATA.week} top scorer, ${top.name} (${fmt(top.pts)}).`
+    : `${fmt(top.pts - total)} short of the real week ${DATA.week} top scorer, ${top.name}.`;
+  $("compare").innerHTML = [
+    ["Best possible from your deals", fmt(best), `${Math.round(total / best * 100) || 0}% of perfect`],
+    [`Real WTS, week ${DATA.week}`, fmt(top.pts), top.name],
+    [`Your week ${DATA.week} best`, fmt(b.weeks[weekKey()]), `All-time ${fmt(b.all.score)}`],
+  ].map(([k, v, d]) => `<div class="stat"><div class="k">${esc(k)}</div><div class="v num">${v}</div><div class="d">${esc(d)}</div></div>`).join("");
+
+  renderSlots($("result-slots"), true);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const order = game.filled.map((f, i) => i);
+  let shown = 0;
+  order.forEach((i, k) => setTimeout(() => {
+    const el = document.querySelector(`[data-pts="${i}"]`);
+    el.textContent = fmt(game.filled[i].pts);
+    el.closest("li").classList.add("flash");
+    shown += game.filled[i].pts;
+    $("total").textContent = fmt(shown);
+  }, reduce ? 0 : 220 * (k + 1)));
+  renderBests();
+}
+
+function start(){
+  game = { lineup: DATA.lineup, filled: DATA.lineup.map(() => null), seen: new Set(), rounds: [], team: null };
+  $("play").hidden = false;
+  $("done").hidden = true;
+  $("total").textContent = fmt(0);
+  renderSlots($("slots"), false);
+  dealNext();
+}
+
+$("players").addEventListener("click", e => {
+  const btn = e.target.closest(".pick");
+  if (btn && !btn.disabled) pick(+btn.dataset.i);
+});
+$("again").addEventListener("click", () => { start(); window.scrollTo({ top: 0, behavior: "smooth" }); });
+
+$("eyebrow").textContent = `Week ${DATA.week} · ${DATA.season}`;
+$("lede").textContent = `${DATA.lineup.length} rounds. Each round you're dealt a random manager's week ${DATA.week} roster, bench included. Take one player for an open slot, then see what your lineup actually scored.`;
+$("foot").innerHTML = `Points are Sleeper's league-scored week ${DATA.week} totals${DATA.partial ? " (week still in progress)" : ""}. Built ${esc(DATA.built)}. <a href="index.html">Scoreboard</a>`;
+renderBests();
+start();
+</script>
+</body>
+</html>

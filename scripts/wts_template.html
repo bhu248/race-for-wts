@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Make a WTS Team</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eef0e5; --surface:#ffffff; --surface-2:#e2e5d6;
+    --text:#211d15; --text-dim:#6d6a5a;
+    --accent:#7a2331; --accent-ink:#fbecee;
+    --good:#1f7a4d; --good-soft:#dcefe3;
+    --gold:#9a6b00; --gold-soft:#f6ebc8;
+    --border:#d8d5c3;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#1a1611; --surface:#241f19; --surface-2:#2e2822;
+      --text:#f2ede2; --text-dim:#a89f8e;
+      --accent:#d98a6f; --accent-ink:#241108;
+      --good:#4caf7d; --good-soft:#1d3226;
+      --gold:#e3b74a; --gold-soft:#3a3018;
+      --border:#3a3327;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#1a1611; --surface:#241f19; --surface-2:#2e2822;
+    --text:#f2ede2; --text-dim:#a89f8e;
+    --accent:#d98a6f; --accent-ink:#241108;
+    --good:#4caf7d; --good-soft:#1d3226;
+    --gold:#e3b74a; --gold-soft:#3a3018;
+    --border:#3a3327;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"Public Sans", ui-sans-serif, system-ui, sans-serif;
+    min-height:100vh; padding:34px 16px 60px;
+  }
+  .num{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-variant-numeric:tabular-nums; }
+  .wrap{ max-width:880px; margin:0 auto; }
+  [hidden]{ display:none !important; }
+
+  .eyebrow{
+    font-family:"IBM Plex Mono", monospace; font-size:0.66rem; letter-spacing:0.14em;
+    text-transform:uppercase; color:var(--accent); margin:0 0 6px;
+  }
+  h1{
+    font-family:"Fraunces", Georgia, serif; font-weight:600;
+    font-size:clamp(2.1rem, 7vw, 2.9rem); line-height:0.98; margin:0; text-wrap:balance;
+  }
+  h2{ font-family:"Fraunces", Georgia, serif; font-weight:600; font-size:1.25rem; margin:0; }
+  .lede{ margin:10px 0 0; color:var(--text-dim); font-size:0.95rem; line-height:1.5; max-width:56ch; }
+  .bests{ margin:14px 0 0; font-size:0.84rem; color:var(--text-dim); }
+  .bests b{ color:var(--text); }
+
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:18px; box-shadow:0 1px 2px rgba(0,0,0,0.05);
+  }
+  .tag{
+    display:inline-block; font-family:"IBM Plex Mono", monospace; font-size:0.62rem; font-weight:600;
+    letter-spacing:0.06em; text-transform:uppercase; border-radius:99px; padding:3px 8px;
+    background:var(--surface-2); color:var(--text-dim); white-space:nowrap;
+  }
+  .tag.gold{ background:var(--gold-soft); color:var(--gold); }
+  .tag.good{ background:var(--good-soft); color:var(--good); }
+
+  .btn{
+    font-family:"IBM Plex Mono", monospace; font-size:0.76rem; font-weight:600; letter-spacing:0.04em;
+    text-transform:uppercase; background:var(--accent); color:var(--accent-ink);
+    border:1px solid var(--accent); border-radius:8px; padding:10px 16px; cursor:pointer;
+  }
+  .btn:hover{ filter:brightness(1.08); }
+  .btn:active{ transform:scale(0.98); }
+  .btn:focus-visible, .pick:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  .game{ display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:16px; align-items:start; margin-top:24px; }
+  @media (max-width: 760px){ .game{ grid-template-columns:minmax(0,1fr); } .lineup-card{ order:-1; } }
+
+  .deal-head{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:4px; }
+  .round{ font-family:"IBM Plex Mono", monospace; font-size:0.7rem; color:var(--text-dim); white-space:nowrap; }
+  .deal-sub{ font-size:0.82rem; color:var(--text-dim); margin:0 0 14px; }
+
+  .players{ list-style:none; margin:0; padding:0; display:grid; gap:6px; }
+  .pick{
+    width:100%; display:flex; align-items:center; gap:10px; text-align:left;
+    font:inherit; color:var(--text); background:var(--surface); cursor:pointer;
+    border:1px solid var(--border); border-radius:9px; padding:9px 12px;
+  }
+  .pick:hover:not(:disabled){ border-color:var(--accent); }
+  .pick:disabled{ opacity:0.35; cursor:default; }
+  .pick .pos{ width:3.4em; flex-shrink:0; }
+  .pick .nm{ flex:1; min-width:0; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pick .tm{ font-family:"IBM Plex Mono", monospace; font-size:0.72rem; color:var(--text-dim); }
+  .pick .to{ font-family:"IBM Plex Mono", monospace; font-size:0.66rem; color:var(--accent); width:4.6em; text-align:right; flex-shrink:0; }
+  .pick:disabled .to{ visibility:hidden; }
+
+  .slots{ list-style:none; margin:10px 0 0; padding:0; display:grid; gap:2px; }
+  .slots li{ display:flex; gap:8px; align-items:baseline; font-size:0.85rem; padding:6px 0; border-bottom:1px dashed var(--border); }
+  .slots li:last-child{ border-bottom:none; }
+  .slots .sl{ font-family:"IBM Plex Mono", monospace; font-size:0.66rem; font-weight:600; color:var(--text-dim); width:3.6em; flex-shrink:0; }
+  .slots .nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .slots .from{ display:block; font-size:0.72rem; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; }
+  .slots .nfl{ font-family:"IBM Plex Mono", monospace; font-size:0.7rem; color:var(--text-dim); font-weight:400; }
+  .slots .empty{ color:var(--text-dim); font-style:italic; }
+  .slots .pts{ font-weight:600; }
+  .slots li.flash{ animation:flash 0.6s ease-out; }
+  @keyframes flash{ from{ background:var(--gold-soft); } to{ background:transparent; } }
+
+  /* ---------- results ---------- */
+  .hero{ text-align:center; padding:28px 18px 24px; margin-top:24px; }
+  .total{ font-family:"Fraunces", Georgia, serif; font-weight:700; font-size:clamp(3.2rem, 15vw, 5rem); line-height:1; margin:6px 0 10px; }
+  .hero .sub{ color:var(--text-dim); margin:0 auto; max-width:44ch; line-height:1.5; font-size:0.92rem; }
+  .compare{ display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-top:20px; }
+  @media (max-width: 560px){ .compare{ grid-template-columns:1fr; } }
+  .stat{ background:var(--surface-2); border-radius:10px; padding:10px 12px; text-align:left; }
+  .stat .k{ font-size:0.72rem; color:var(--text-dim); }
+  .stat .v{ font-size:1.15rem; font-weight:600; margin-top:2px; }
+  .stat .d{ font-size:0.72rem; color:var(--text-dim); margin-top:2px; }
+  .results{ margin-top:16px; }
+  .results .slots li{ align-items:center; }
+  .actions{ display:flex; justify-content:center; gap:8px; margin-top:20px; }
+
+  .foot{ margin-top:28px; font-size:0.74rem; color:var(--text-dim); }
+  .foot a{ color:inherit; }
+  @media (prefers-reduced-motion: reduce){ .slots li.flash{ animation:none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow" id="eyebrow"></p>
+  <h1>Make a WTS Team</h1>
+  <p class="lede" id="lede"></p>
+  <p class="bests" id="bests"></p>
+
+  <section id="play" class="game">
+    <div class="card">
+      <div class="deal-head">
+        <h2 id="dealt"></h2>
+        <span class="round" id="round"></span>
+      </div>
+      <p class="deal-sub">Take one player. Points stay hidden until your lineup is full.</p>
+      <ul class="players" id="players"></ul>
+    </div>
+    <div class="card lineup-card">
+      <h2>Your lineup</h2>
+      <ul class="slots" id="slots"></ul>
+    </div>
+  </section>
+
+  <section id="done" hidden>
+    <div class="card hero">
+      <p class="eyebrow" id="done-eyebrow">Final score</p>
+      <div class="total num" id="total">0.00</div>
+      <p class="sub" id="verdict"></p>
+      <div class="compare" id="compare"></div>
+    </div>
+    <div class="card results">
+      <h2>Your lineup</h2>
+      <ul class="slots" id="result-slots"></ul>
+    </div>
+    <div class="actions"><button class="btn" id="again">Play again</button></div>
+  </section>
+
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+const DATA = /*__WTS_DATA__*/null;
+
+const ELIGIBLE = {
+  QB:["QB"], RB:["RB"], WR:["WR"], TE:["TE"], K:["K"], DEF:["DEF"],
+  FLEX:["RB","WR","TE"], WRRB_FLEX:["RB","WR"], REC_FLEX:["WR","TE"], SUPER_FLEX:["QB","RB","WR","TE"],
+};
+const SLOT_LABEL = { WRRB_FLEX:"W/R", REC_FLEX:"W/T", SUPER_FLEX:"SFLX" };
+const STORE_KEY = "wts-team-bests";
+const $ = id => document.getElementById(id);
+const fmt = n => n.toFixed(2);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const slotLabel = s => SLOT_LABEL[s] || s;
+const fits = (slot, pos) => (ELIGIBLE[slot] || [slot]).includes(pos);
+
+let game;
+
+function loadBests(){
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch(e){ return {}; }
+}
+function saveBests(b){
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(b)); } catch(e){}
+}
+function weekKey(){ return DATA.season + "-" + DATA.week; }
+
+function renderBests(){
+  const b = loadBests(), wk = (b.weeks || {})[weekKey()], all = b.all;
+  const parts = [];
+  parts.push(wk ? `Your week ${DATA.week} best: <b class="num">${fmt(wk)}</b>` : `No week ${DATA.week} score yet`);
+  if (all) parts.push(`All-time best: <b class="num">${fmt(all.score)}</b> (week ${all.week})`);
+  if (b.plays) parts.push(`${b.plays} game${b.plays === 1 ? "" : "s"} played`);
+  $("bests").innerHTML = parts.join(" · ");
+}
+
+// Exact-position slot first, then the narrowest flex that takes it.
+function slotFor(pos){
+  const open = game.lineup.map((s, i) => i).filter(i => !game.filled[i] && fits(game.lineup[i], pos));
+  open.sort((a, b) => (ELIGIBLE[game.lineup[a]] || [1]).length - (ELIGIBLE[game.lineup[b]] || [1]).length);
+  return open.length ? open[0] : -1;
+}
+
+function dealNext(){
+  const useful = t => t.players.some(p => slotFor(p.p) >= 0);
+  let pool = DATA.teams.filter(t => !game.seen.has(t.name) && useful(t));
+  if (!pool.length) pool = DATA.teams.filter(useful);
+  game.team = pool[Math.floor(Math.random() * pool.length)];
+  game.seen.add(game.team.name);
+  renderDeal();
+}
+
+function renderDeal(){
+  const round = game.filled.filter(Boolean).length + 1;
+  $("dealt").textContent = game.team.name;
+  $("round").textContent = `Round ${round} of ${game.lineup.length}`;
+  $("players").innerHTML = game.team.players.map((p, i) => {
+    const s = slotFor(p.p);
+    return `<li><button class="pick" data-i="${i}" ${s < 0 ? "disabled" : ""}>
+      <span class="pos"><span class="tag">${p.p}</span></span>
+      <span class="nm">${esc(p.n)}</span>
+      <span class="tm">${esc(p.t)}</span>
+      <span class="to">${s >= 0 ? "→ " + slotLabel(game.lineup[s]) : ""}</span>
+    </button></li>`;
+  }).join("");
+}
+
+function renderSlots(target, reveal, flashIdx){
+  target.innerHTML = game.lineup.map((s, i) => {
+    const f = game.filled[i];
+    const body = f
+      ? `<span class="nm">${esc(f.n)} <span class="nfl">${esc(f.t)}</span><span class="from">from ${esc(f.from)}</span></span>`
+      : `<span class="nm empty">empty</span>`;
+    const pts = reveal && f ? `<span class="pts num" data-pts="${i}">–</span>` : "";
+    return `<li class="${i === flashIdx ? "flash" : ""}"><span class="sl">${slotLabel(s)}</span>${body}${pts}</li>`;
+  }).join("");
+}
+
+function pick(i){
+  const p = game.team.players[i], s = slotFor(p.p);
+  if (s < 0) return;
+  game.filled[s] = { ...p, from: game.team.name, round: game.rounds.length };
+  game.rounds.push(game.team);
+  renderSlots($("slots"), false, s);
+  if (game.filled.every(Boolean)) finish(); else dealNext();
+}
+
+// Best lineup possible from the same deals, one player per deal (DP over filled-slot bitmask).
+function bestPossible(){
+  const n = game.lineup.length;
+  let dp = new Map([[0, 0]]);
+  for (const team of game.rounds){
+    const next = new Map();
+    for (const [mask, val] of dp){
+      for (let s = 0; s < n; s++){
+        if (mask & (1 << s)) continue;
+        let best = -Infinity;
+        for (const p of team.players) if (fits(game.lineup[s], p.p)) best = Math.max(best, p.pts);
+        if (best === -Infinity) continue;
+        const m = mask | (1 << s), v = val + best;
+        if (!next.has(m) || next.get(m) < v) next.set(m, v);
+      }
+    }
+    dp = next;
+  }
+  return dp.get((1 << n) - 1) ?? 0;
+}
+
+function finish(){
+  const total = game.filled.reduce((a, f) => a + f.pts, 0);
+  const best = bestPossible();
+  const top = DATA.teams.reduce((a, t) => t.pts > a.pts ? t : a);
+
+  const b = loadBests();
+  b.weeks = b.weeks || {};
+  const prevWeek = b.weeks[weekKey()];
+  const newWeekBest = prevWeek === undefined || total > prevWeek;
+  const newAllBest = !b.all || total > b.all.score;
+  if (newWeekBest) b.weeks[weekKey()] = total;
+  if (newAllBest) b.all = { score: total, week: DATA.week };
+  b.plays = (b.plays || 0) + 1;
+  saveBests(b);
+
+  $("play").hidden = true;
+  $("done").hidden = false;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  const beatTop = total > top.pts;
+  $("done-eyebrow").innerHTML = newAllBest && b.plays > 1
+    ? `<span class="tag gold">New personal best</span>`
+    : newWeekBest && prevWeek !== undefined ? `<span class="tag gold">New week ${DATA.week} best</span>` : "Final score";
+  $("verdict").textContent = beatTop
+    ? `That beats the real week ${DATA.week} top scorer, ${top.name} (${fmt(top.pts)}).`
+    : `${fmt(top.pts - total)} short of the real week ${DATA.week} top scorer, ${top.name}.`;
+  $("compare").innerHTML = [
+    ["Best possible from your deals", fmt(best), `${Math.round(total / best * 100) || 0}% of perfect`],
+    [`Real WTS, week ${DATA.week}`, fmt(top.pts), top.name],
+    [`Your week ${DATA.week} best`, fmt(b.weeks[weekKey()]), `All-time ${fmt(b.all.score)}`],
+  ].map(([k, v, d]) => `<div class="stat"><div class="k">${esc(k)}</div><div class="v num">${v}</div><div class="d">${esc(d)}</div></div>`).join("");
+
+  renderSlots($("result-slots"), true);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const order = game.filled.map((f, i) => i);
+  let shown = 0;
+  order.forEach((i, k) => setTimeout(() => {
+    const el = document.querySelector(`[data-pts="${i}"]`);
+    el.textContent = fmt(game.filled[i].pts);
+    el.closest("li").classList.add("flash");
+    shown += game.filled[i].pts;
+    $("total").textContent = fmt(shown);
+  }, reduce ? 0 : 220 * (k + 1)));
+  renderBests();
+}
+
+function start(){
+  game = { lineup: DATA.lineup, filled: DATA.lineup.map(() => null), seen: new Set(), rounds: [], team: null };
+  $("play").hidden = false;
+  $("done").hidden = true;
+  $("total").textContent = fmt(0);
+  renderSlots($("slots"), false);
+  dealNext();
+}
+
+$("players").addEventListener("click", e => {
+  const btn = e.target.closest(".pick");
+  if (btn && !btn.disabled) pick(+btn.dataset.i);
+});
+$("again").addEventListener("click", () => { start(); window.scrollTo({ top: 0, behavior: "smooth" }); });
+
+$("eyebrow").textContent = `Week ${DATA.week} · ${DATA.season}`;
+$("lede").textContent = `${DATA.lineup.length} rounds. Each round you're dealt a random manager's week ${DATA.week} roster, bench included. Take one player for an open slot, then see what your lineup actually scored.`;
+$("foot").innerHTML = `Points are Sleeper's league-scored week ${DATA.week} totals${DATA.partial ? " (week still in progress)" : ""}. Built ${esc(DATA.built)}. <a href="index.html">Scoreboard</a>`;
+renderBests();
+start();
+</script>
+</body>
+</html>

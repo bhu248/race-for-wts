@@ -258,9 +258,14 @@ def render_index():
     weeks.sort(reverse=True)
 
     items = "\n".join(f'<li><a href="week{w}.html">Week {w}</a></li>' for w in weeks) or "<li>No weeks played yet.</li>"
-    extras = ""
+    extra_items = []
+    if os.path.exists(os.path.join(DOCS_DIR, "wts.html")):
+        extra_items.append('<li><a href="wts.html">Make a WTS Team</a> &mdash; build a lineup one random manager\'s roster at a time</li>')
     if os.path.exists(os.path.join(DOCS_DIR, "redraft.html")):
-        extras = '<h2>Extras</h2>\n  <ul>\n<li><a href="redraft.html">Draft Do-Over</a> &mdash; redraft with hindsight against 13 clueless bots</li>\n  </ul>'
+        extra_items.append('<li><a href="redraft.html">Draft Do-Over</a> &mdash; redraft with hindsight against 13 clueless bots</li>')
+    extras = ""
+    if extra_items:
+        extras = '<h2>Extras</h2>\n  <ul>\n' + "\n".join(extra_items) + '\n  </ul>'
     html = INDEX_TEMPLATE.replace("__ITEMS__", items).replace("__EXTRAS__", extras)
     with open(os.path.join(DOCS_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(html)
