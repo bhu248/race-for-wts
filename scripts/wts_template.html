@@ -81,11 +81,40 @@
   .btn:focus-visible, .pick:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
 
   .game{ display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:16px; align-items:start; margin-top:24px; }
-  @media (max-width: 760px){ .game{ grid-template-columns:minmax(0,1fr); } .lineup-card{ order:-1; } }
+  @media (max-width: 760px){ .game{ grid-template-columns:minmax(0,1fr); } }
 
-  .deal-head{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:4px; }
+  .steps{ display:grid; gap:16px; min-width:0; }
+  .deal-head{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+  .step{ font-family:"IBM Plex Mono", monospace; font-size:0.66rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-dim); margin:0 0 10px; }
   .round{ font-family:"IBM Plex Mono", monospace; font-size:0.7rem; color:var(--text-dim); white-space:nowrap; }
-  .deal-sub{ font-size:0.82rem; color:var(--text-dim); margin:0 0 14px; }
+  .deal-sub{ font-size:0.8rem; color:var(--text-dim); margin:8px 0 0; line-height:1.45; }
+
+  .roller{
+    display:flex; align-items:center; justify-content:center; min-height:76px; padding:0 12px;
+    border-radius:10px; background:var(--surface-2); overflow:hidden;
+    font-family:"Fraunces", Georgia, serif; font-weight:600; font-size:clamp(1.35rem, 5vw, 1.75rem);
+    text-align:center; transition:background 0.25s, box-shadow 0.25s;
+  }
+  .roller span{ display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .roller.rolling span{ color:var(--text-dim); animation:tick 0.09s ease-out; }
+  .roller.landed{ background:var(--gold-soft); box-shadow:0 0 0 1px var(--gold) inset; }
+  .roller.landed span{ animation:land 0.35s cubic-bezier(.2,1.6,.4,1); }
+  @keyframes tick{ from{ transform:translateY(-40%); opacity:0.3; } to{ transform:none; opacity:1; } }
+  @keyframes land{ from{ transform:scale(0.85); } to{ transform:none; } }
+  .pips{ display:flex; gap:5px; justify-content:center; margin-top:12px; }
+  .pips i{ width:7px; height:7px; border-radius:50%; background:var(--border); }
+  .pips i.done{ background:var(--text-dim); }
+  .pips i.now{ background:var(--accent); }
+
+  #search{
+    font:inherit; font-size:0.95rem; color:var(--text); background:var(--surface-2); width:100%;
+    border:1px solid var(--border); border-radius:8px; padding:10px 12px;
+  }
+  #search:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  #search:disabled{ opacity:0.5; }
+  #search-card.waiting{ opacity:0.6; }
+  .players:not(:empty){ margin-top:12px; }
+  .players .none{ font-size:0.84rem; color:var(--text-dim); padding:6px 2px; }
 
   .players{ list-style:none; margin:0; padding:0; display:grid; gap:6px; }
   .pick{
@@ -99,7 +128,7 @@
   .pick .nm{ flex:1; min-width:0; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .pick .tm{ font-family:"IBM Plex Mono", monospace; font-size:0.72rem; color:var(--text-dim); }
   .pick .to{ font-family:"IBM Plex Mono", monospace; font-size:0.66rem; color:var(--accent); width:4.6em; text-align:right; flex-shrink:0; }
-  .pick:disabled .to{ visibility:hidden; }
+  .pick:disabled .to{ color:var(--text-dim); }
 
   .slots{ list-style:none; margin:10px 0 0; padding:0; display:grid; gap:2px; }
   .slots li{ display:flex; gap:8px; align-items:baseline; font-size:0.85rem; padding:6px 0; border-bottom:1px dashed var(--border); }
@@ -140,13 +169,21 @@
   <p class="bests" id="bests"></p>
 
   <section id="play" class="game">
-    <div class="card">
-      <div class="deal-head">
-        <h2 id="dealt"></h2>
-        <span class="round" id="round"></span>
+    <div class="steps">
+      <div class="card">
+        <div class="deal-head">
+          <p class="step">Step 1 · Get a random manager</p>
+          <span class="round" id="round"></span>
+        </div>
+        <div class="roller" id="roller"><span id="dealt"></span></div>
+        <div class="pips" id="pips"></div>
       </div>
-      <p class="deal-sub">Take one player. Points stay hidden until your lineup is full.</p>
-      <ul class="players" id="players"></ul>
+      <div class="card" id="search-card">
+        <p class="step">Step 2 · Pick your player</p>
+        <input type="search" id="search" autocomplete="off" spellcheck="false">
+        <p class="deal-sub" id="search-hint">Type a name or a position (RB, WR, FLEX). Points stay hidden until your lineup is full.</p>
+        <ul class="players" id="players"></ul>
+      </div>
     </div>
     <div class="card lineup-card">
       <h2>Your lineup</h2>
@@ -218,20 +255,74 @@ function dealNext(){
   if (!pool.length) pool = DATA.teams.filter(useful);
   game.team = pool[Math.floor(Math.random() * pool.length)];
   game.seen.add(game.team.name);
-  renderDeal();
+  roll(game.team);
 }
 
-function renderDeal(){
-  const round = game.filled.filter(Boolean).length + 1;
-  $("dealt").textContent = game.team.name;
-  $("round").textContent = `Round ${round} of ${game.lineup.length}`;
-  $("players").innerHTML = game.team.players.map((p, i) => {
-    const s = slotFor(p.p);
+// Slot-machine spin through manager names, slowing down until it lands on the dealt team.
+function roll(team){
+  const token = game.token = {};
+  const round = game.filled.filter(Boolean).length;
+  $("round").textContent = `Round ${round + 1} of ${game.lineup.length}`;
+  $("pips").innerHTML = game.lineup.map((s, i) => `<i class="${i < round ? "done" : i === round ? "now" : ""}"></i>`).join("");
+  const roller = $("roller"), label = $("dealt"), search = $("search");
+  search.value = "";
+  search.disabled = true;
+  search.placeholder = "Rolling…";
+  $("search-card").classList.add("waiting");
+  $("players").innerHTML = "";
+  roller.className = "roller rolling";
+
+  const names = DATA.teams.map(t => t.name);
+  let delay = 45, last = -1;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const step = () => {
+    if (game.token !== token) return;
+    if (reduce || delay > 260){
+      label.textContent = team.name;
+      roller.className = "roller landed";
+      search.disabled = false;
+      search.placeholder = `Search ${team.name}'s players`;
+      $("search-card").classList.remove("waiting");
+      search.focus({ preventScroll: true });
+      return;
+    }
+    let i;
+    do { i = Math.floor(Math.random() * names.length); } while (names.length > 1 && (i === last || names[i] === team.name && delay < 200));
+    last = i;
+    label.textContent = names[i];
+    label.style.animation = "none"; label.offsetWidth; label.style.animation = "";
+    delay *= 1.13;
+    setTimeout(step, delay);
+  };
+  step();
+}
+
+const POS_ALIASES = { DST:"DEF", "D/ST":"DEF", D:"DEF", PK:"K" };
+
+function matches(q){
+  const u = q.trim().toUpperCase();
+  if (!u) return [];
+  const pos = POS_ALIASES[u] || u;
+  if (ELIGIBLE[pos]) return game.team.players.filter(p => ELIGIBLE[pos].includes(p.p));
+  const l = q.trim().toLowerCase();
+  return game.team.players.filter(p => p.n.toLowerCase().includes(l) || p.t.toLowerCase() === l);
+}
+
+function renderResults(){
+  const q = $("search").value, list = matches(q);
+  if (!q.trim()){ $("players").innerHTML = ""; return; }
+  if (!list.length){
+    $("players").innerHTML = `<li class="none">No ${esc(q.trim())} on ${esc(game.team.name)}'s roster.</li>`;
+    return;
+  }
+  list.sort((a, b) => (slotFor(a.p) < 0) - (slotFor(b.p) < 0));
+  $("players").innerHTML = list.map(p => {
+    const s = slotFor(p.p), i = game.team.players.indexOf(p);
     return `<li><button class="pick" data-i="${i}" ${s < 0 ? "disabled" : ""}>
       <span class="pos"><span class="tag">${p.p}</span></span>
       <span class="nm">${esc(p.n)}</span>
       <span class="tm">${esc(p.t)}</span>
-      <span class="to">${s >= 0 ? "→ " + slotLabel(game.lineup[s]) : ""}</span>
+      <span class="to">${s >= 0 ? "→ " + slotLabel(game.lineup[s]) : "filled"}</span>
     </button></li>`;
   }).join("");
 }
@@ -335,6 +426,12 @@ function start(){
 $("players").addEventListener("click", e => {
   const btn = e.target.closest(".pick");
   if (btn && !btn.disabled) pick(+btn.dataset.i);
+});
+$("search").addEventListener("input", renderResults);
+$("search").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  const btn = document.querySelector("#players .pick:not(:disabled)");
+  if (btn) pick(+btn.dataset.i);
 });
 $("again").addEventListener("click", () => { start(); window.scrollTo({ top: 0, behavior: "smooth" }); });
 
