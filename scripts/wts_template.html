@@ -139,6 +139,7 @@
   .slots .nfl{ font-family:"IBM Plex Mono", monospace; font-size:0.7rem; color:var(--text-dim); font-weight:400; }
   .slots .empty{ color:var(--text-dim); font-style:italic; }
   .slots .pts{ font-weight:600; }
+  .running{ display:flex; justify-content:space-between; margin-top:8px; padding-top:10px; border-top:1px solid var(--border); font-size:0.88rem; font-weight:600; }
   .slots li.flash{ animation:flash 0.6s ease-out; }
   @keyframes flash{ from{ background:var(--gold-soft); } to{ background:transparent; } }
 
@@ -181,13 +182,14 @@
       <div class="card" id="search-card">
         <p class="step">Step 2 · Pick your player</p>
         <input type="search" id="search" autocomplete="off" spellcheck="false">
-        <p class="deal-sub" id="search-hint">Type a name or a position (RB, WR, FLEX). Points stay hidden until your lineup is full.</p>
+        <p class="deal-sub" id="search-hint">Type a name or a position (RB, WR, FLEX). Their week's score shows once you pick them.</p>
         <ul class="players" id="players"></ul>
       </div>
     </div>
     <div class="card lineup-card">
       <h2>Your lineup</h2>
       <ul class="slots" id="slots"></ul>
+      <div class="running"><span>Total</span><span class="num" id="running">0.00</span></div>
     </div>
   </section>
 
@@ -333,9 +335,10 @@ function renderSlots(target, reveal, flashIdx){
     const body = f
       ? `<span class="nm">${esc(f.n)} <span class="nfl">${esc(f.t)}</span><span class="from">from ${esc(f.from)}</span></span>`
       : `<span class="nm empty">empty</span>`;
-    const pts = reveal && f ? `<span class="pts num" data-pts="${i}">–</span>` : "";
+    const pts = !f ? "" : reveal ? `<span class="pts num" data-pts="${i}">–</span>` : `<span class="pts num">${fmt(f.pts)}</span>`;
     return `<li class="${i === flashIdx ? "flash" : ""}"><span class="sl">${slotLabel(s)}</span>${body}${pts}</li>`;
   }).join("");
+  if (!reveal) $("running").textContent = fmt(game.filled.reduce((a, f) => a + (f ? f.pts : 0), 0));
 }
 
 function pick(i){
@@ -436,7 +439,7 @@ $("search").addEventListener("keydown", e => {
 $("again").addEventListener("click", () => { start(); window.scrollTo({ top: 0, behavior: "smooth" }); });
 
 $("eyebrow").textContent = `Week ${DATA.week} · ${DATA.season}`;
-$("lede").textContent = `${DATA.lineup.length} rounds. Each round you're dealt a random manager's week ${DATA.week} roster, bench included. Take one player for an open slot, then see what your lineup actually scored.`;
+$("lede").textContent = `${DATA.lineup.length} rounds. Each round you're dealt a random manager's week ${DATA.week} roster, bench included. Take one player for an open slot and see what they actually scored.`;
 $("foot").innerHTML = `Points are Sleeper's league-scored week ${DATA.week} totals${DATA.partial ? " (week still in progress)" : ""}. Built ${esc(DATA.built)}. <a href="index.html">Scoreboard</a>`;
 renderBests();
 start();
