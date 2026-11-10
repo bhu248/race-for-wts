@@ -5,8 +5,8 @@ open lineup slot, and at the end the picks' real fantasy points are tallied.
 
 Run this by hand (not part of the polling workflow):
 
-    python scripts/build_wts.py            # the most recent week Sleeper is displaying
-    python scripts/build_wts.py --week 9   # pin a specific week
+    python scripts/build_wts.py            # week 9, the only week this game is meant to run
+    python scripts/build_wts.py --week 10  # a different week, if that ever changes
 
 Everything the page needs is baked into one JSON blob inside the HTML (no
 runtime API calls from the browser), same approach as build_redraft.py.
@@ -30,17 +30,18 @@ TEMPLATE = os.path.join(ROOT, "scripts", "wts_template.html")
 OUT = os.path.join(ROOT, "docs", "wts.html")
 
 LABEL_RE = re.compile(r"^(.*) \(([A-Z]+)\)$")
+WEEK = 9  # the game is a one-off for this week; rebuilding shouldn't silently move it
 POS_ORDER = {"QB": 0, "RB": 1, "WR": 2, "TE": 3, "K": 4, "DEF": 5}
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--week", type=int, help="week to use (default: Sleeper's display week)")
+    ap.add_argument("--week", type=int, default=WEEK, help=f"week to use (default: {WEEK})")
     args = ap.parse_args()
 
     state = common.get_state()
     season = str(state["season"])
-    week = args.week or int(state.get("display_week") or state["week"])
+    week = args.week
 
     league = common.get_league(LEAGUE_ID)
     names = common.team_names(LEAGUE_ID)
